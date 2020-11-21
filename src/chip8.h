@@ -1,5 +1,6 @@
 #pragma once
-#include "inttypes.h"
+#include <inttypes.h>
+#include <stdio.h>
 
 typedef struct Chip8
 {
@@ -24,7 +25,7 @@ typedef struct Chip8
     uint8_t memory[4096];
 
     // IO
-    uint8_t display[4096]; // one byte per pixel
+    uint8_t *display; // one byte per pixel
     uint8_t keyboard[16];
 
     // Registers
@@ -41,4 +42,9 @@ typedef struct Chip8
     uint16_t stack[16];
 } Chip8;
 
-Chip8 *chip8_create(int width, int height, int clock_speed, const char *rom);
+int chip8_init(Chip8 *state, int width, int height, int clock_speed, const char *rom);
+
+int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size);
+
+int chip8_dump(FILE *f, Chip8 *state);
+int chip8_restore(FILE *f, Chip8 *state);

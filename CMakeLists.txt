@@ -13,3 +13,14 @@ add_executable(
 )
 
 target_link_libraries(emulator ${SDL2_LIBRARIES})
+
+
+# add_executable(test-chip8 test/chip8.c)
+
+# target_link_libraries(test-chip8 PRIVATE libchip8)
+
+# /usr/include/cmocka.h
+# /usr/include/cmocka_pbc.h
+# /usr/lib/x86_64-linux-gnu/libcmocka.so
+# /usr/lib/x86_64-linux-gnu/libcmocka.so.0
+# /usr/lib/x86_64-linux-gnu/libcmocka.so.0.7.0

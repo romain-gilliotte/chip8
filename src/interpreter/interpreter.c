@@ -20,7 +20,7 @@ static void exec_0nnn(Chip8 *state)
  */
 static void exec_00e0(Chip8 *state)
 {
-    memset(state->display, 0, 64 * 32);
+    memset(state->display, 0, state->screen_width * state->screen_height);
     state->PC += 2;
 }
 
@@ -365,7 +365,7 @@ static void exec_dxyn(Chip8 *state)
     {
         for (int x = 0; x < 8; ++x)
         {
-            uint16_t position = (y0 + y) * 64 + x0 + x;
+            uint16_t position = (y0 + y) * state->screen_width + x0 + x;
             uint8_t new_pixel = 1 & (state->memory[state->I + y] >> (8 - x));
 
             state->registers[15] |= new_pixel & state->display[position];
@@ -548,9 +548,9 @@ static void exec_fx65(Chip8 *state)
     state->PC += 2;
 }
 
-int chip8_run(Chip8 *state, int microtime)
+int chip8_run(Chip8 *state, uint64_t microtime)
 {
-    uint32_t expected_cc = microtime * state->clock_speed / 1e6;
+    uint64_t expected_cc = microtime * state->clock_speed / 1e6;
 
     int result = 0;
     while (!result && state->cycle_counts < expected_cc)

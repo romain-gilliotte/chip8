@@ -19,6 +19,7 @@ Some milestones for this project.
 
 - [x] Basic build system with CMake
 - [ ] Interpreter, graphics, input.
+- [ ] Quality: Linter?
 - [ ] Recompiler for a couple of supported instructions (it's ok to fallback to the interpreter all the time)
 - [ ] Write NodeJS native library
 - [ ] Write CPython native library
@@ -50,6 +51,7 @@ This section contains resources I'm using.
 ## About Chip8 itself
 
 http://emulator101.com/
+http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
 ## About Dependencies
 
