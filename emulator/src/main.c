@@ -2,8 +2,8 @@
 #include <time.h>
 #include <sys/time.h>
 #include <SDL2/SDL.h>
-#include "chip8.h"
-#include "interpreter/interpreter.h"
+#include <chip8.h>
+#include <interpreter/interpreter.h>
 
 static int process_events(Chip8 *state)
 {
@@ -48,7 +48,8 @@ int main(const int argc, const char **argv)
 {
     // Init Chip8 & SDL
     Chip8 state;
-    chip8_init(&state, 64, 32, 500, "../roms/demos/Maze [David Winter, 199x].ch8");
+    chip8_init(&state, 64, 32, 500);
+    chip8_load_rom(&state, "../roms/demos/Maze [David Winter, 199x].ch8");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("Chip8",

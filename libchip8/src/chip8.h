@@ -42,7 +42,12 @@ typedef struct Chip8
     uint16_t stack[16];
 } Chip8;
 
-int chip8_init(Chip8 *state, int width, int height, int clock_speed, const char *rom);
+/**
+ * Initialize the Chip8 struct
+ */
+int chip8_init(Chip8 *state, int width, int height, int clock_speed);
+
+int chip8_load_rom(Chip8 *state, const char *rom);
 
 int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size);
 

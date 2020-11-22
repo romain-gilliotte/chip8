@@ -269,7 +269,7 @@ static void exec_8xy7(Chip8 *state)
 }
 
 /**
- * 8xyE - SHL Vx {, Vy}
+ * 8xyE - SHL Vx, Vy
  * Set Vx = Vx SHL 1.
  * 
  * If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.

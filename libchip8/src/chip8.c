@@ -22,7 +22,7 @@ static uint8_t sprites[5 * 16] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 };
 
-int chip8_init(Chip8 *state, int width, int height, int clock_speed, const char *rom)
+int chip8_init(Chip8 *state, int width, int height, int clock_speed)
 {
     memset(state, 0, sizeof *state);
 
@@ -36,6 +36,11 @@ int chip8_init(Chip8 *state, int width, int height, int clock_speed, const char 
     // Load fonts
     memcpy(state->memory, sprites, 5 * 16);
 
+    return 0;
+}
+
+int chip8_load_rom(Chip8 *state, const char *rom)
+{
     // Load ROM
     FILE *f = fopen(rom, "rb");
     fseek(f, 0, SEEK_END);
