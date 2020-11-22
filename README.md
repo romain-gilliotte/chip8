@@ -69,6 +69,10 @@ https://cmake.org/documentation/
 
 https://www.youtube.com/playlist?list=PLK6MXr8gasrGmIiSuVQXpfFuE1uPT615s
 
+### Cmocka
+
+https://api.cmocka.org/group__cmocka__exec.html#ga7c62fd0acf2235ce98268c28ee262a57
+
 ### Nuget
 
 https://www.nuget.org/packages/sdl2/
