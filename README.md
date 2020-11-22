@@ -18,6 +18,7 @@ Be indulgent!
 Some milestones for this project.
 
 - [x] Basic build system with CMake
+- [x] Unit testing
 - [ ] Interpreter, graphics, input.
 - [ ] Quality: Linter?
 - [ ] Recompiler for a couple of supported instructions (it's ok to fallback to the interpreter all the time)
@@ -26,7 +27,6 @@ Some milestones for this project.
 - [ ] Cross-compilation: Make this work in both windows / linux
 - [ ] Delivery: Distro packages, flatpak, windows installers...
 - [ ] Dependency management: Nuget? Conan? How to use/bundle recent versions of dependencies? npm's package.json equivalent?
-- [ ] Unit testing: Google Test? CTest?
 - [ ] CI/CD: What are the industry standart CI/CD systems for C/C++?
 - [ ] Recompiler supporting most instructions
 - [ ] Use LLVM instead of x86?
@@ -68,6 +68,8 @@ https://www.jetbrains.com/lp/devecosystem-2020/c/
 https://cmake.org/documentation/
 
 https://www.youtube.com/playlist?list=PLK6MXr8gasrGmIiSuVQXpfFuE1uPT615s
+
+https://www.youtube.com/watch?v=y7ndUhdQuU8
 
 ### Cmocka
 

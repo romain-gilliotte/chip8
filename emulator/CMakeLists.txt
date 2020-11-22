@@ -1,21 +1,18 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13)
 
 project(emulator VERSION 1.0.0)
 
-find_package(SDL2 REQUIRED)
+add_executable(${PROJECT_NAME})
 
-add_executable(
+target_sources(
     ${PROJECT_NAME}
-    src/main.c
-)
-
-target_include_directories(
-    ${PROJECT_NAME}
-    PRIVATE ${SDL2_INCLUDE_DIR}
+    PRIVATE
+        src/main.c        
 )
 
 target_link_libraries(
     ${PROJECT_NAME}
-    PRIVATE ${SDL2_LIBRARIES}
-    PRIVATE chip8
+    PRIVATE
+        SDL2 
+        chip8
 )

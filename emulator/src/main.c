@@ -49,7 +49,7 @@ int main(const int argc, const char **argv)
     // Init Chip8 & SDL
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "../roms/demos/Maze [David Winter, 199x].ch8");
+    chip8_load_rom(&state, "../../roms/demos/Maze [David Winter, 199x].ch8");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("Chip8",
