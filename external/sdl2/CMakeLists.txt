@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.13)
 
 find_package(SDL2 REQUIRED)
 
-# add_library(sdl2 SHARED IMPORTED GLOBAL)
+# add_library(SDL2 SHARED IMPORTED GLOBAL)
 
 # set_target_properties(
-#     sdl2
+#     SDL2
 #     PROPERTIES
 #     INTERFACE_INCLUDE_DIRECTORIES "${SDL2_INCLUDE_DIRS}"
 #     

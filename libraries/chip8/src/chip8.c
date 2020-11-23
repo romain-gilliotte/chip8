@@ -43,14 +43,20 @@ int chip8_load_rom(Chip8 *state, const char *rom)
 {
     // Load ROM
     FILE *f = fopen(rom, "rb");
+    if (f == NULL)
+        return CHIP8_ROM_NOT_FOUND;
+
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
+    if (fsize + 0x200 > sizeof(state->memory))
+        return CHIP8_ROM_TOO_LONG;
+
     fseek(f, 0, SEEK_SET);
     fread(state->memory + 0x200, fsize, 1, f);
 
     // Print asm
-    printf("Loading rom at %s\n", rom);
-    chip8_disassemble(stdout, state->memory + 512, fsize);
+    // printf("Loading rom at %s\n", rom);
+    // chip8_disassemble(stdout, state->memory + 512, fsize);
     fclose(f);
 
     return 0;
@@ -74,73 +80,73 @@ int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size)
         if (q1 == 0x0000)
         {
             if (opcode == 0x00E0)
-                fprintf(f, "0x%04x: CLS # Clear the display\n", addr);
+                fprintf(f, "0x%04x: CLS  # Clear the display\n", addr);
             else if (opcode == 0x00ee)
-                fprintf(f, "0x%04x: RET # Return from a subroutine\n", addr);
+                fprintf(f, "0x%04x: RET  # Return from a subroutine\n", addr);
             else
-                fprintf(f, "0x%04x: SYS 0x%04x # Jump to a machine code routine\n", addr, nnn);
+                fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);
         }
         else if (q1 == 0x1000)
-            fprintf(f, "0x%04x: JMP 0x%04x\n", addr, nnn);
+            fprintf(f, "0x%04x: JMP  0x%04x\n", addr, nnn);
         else if (q1 == 0x2000)
             fprintf(f, "0x%04x: CALL 0x%04x\n", addr, nnn);
         else if (q1 == 0x3000)
-            fprintf(f, "0x%04x: SE V%x, 0x%02x\n", addr, x, kk);
+            fprintf(f, "0x%04x: SE   V%x, 0x%02x\n", addr, x, kk);
         else if (q1 == 0x4000)
-            fprintf(f, "0x%04x: SNE V%x, 0x%02x\n", addr, x, kk);
+            fprintf(f, "0x%04x: SNE  V%x, 0x%02x\n", addr, x, kk);
         else if (q1 == 0x5000)
         {
-            if (opcode & 0x000F == 0)
-                fprintf(f, "0x%04x: SE V%x, V%x\n", addr, x, y);
+            if ((opcode & 0x000F) == 0)
+                fprintf(f, "0x%04x: SE   V%x, V%x\n", addr, x, y);
             else
                 fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);
         }
         else if (q1 == 0x6000)
-            fprintf(f, "0x%04x: LD V%x, 0x%02x\n", addr, x, kk);
+            fprintf(f, "0x%04x: LD   V%x, 0x%02x\n", addr, x, kk);
         else if (q1 == 0x7000)
-            fprintf(f, "0x%04x: ADD V%x, 0x%02x\n", addr, x, kk);
+            fprintf(f, "0x%04x: ADD  V%x, 0x%02x\n", addr, x, kk);
         else if (q1 == 0x8000)
         {
             if (q4 == 0x0000)
-                fprintf(f, "0x%04x: LD V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: LD   V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0001)
-                fprintf(f, "0x%04x: OR V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: OR   V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0002)
-                fprintf(f, "0x%04x: AND V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: AND   V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0003)
-                fprintf(f, "0x%04x: XOR V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: XOR  V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0004)
-                fprintf(f, "0x%04x: ADD V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: ADD  V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0005)
-                fprintf(f, "0x%04x: SUB V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: SUB  V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0006)
-                fprintf(f, "0x%04x: SHR V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: SHR  V%x, V%x\n", addr, x, y);
             else if (q4 == 0x0007)
                 fprintf(f, "0x%04x: SUBN V%x, V%x\n", addr, x, y);
             else if (q4 == 0x000e)
-                fprintf(f, "0x%04x: SHL V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: SHL  V%x, V%x\n", addr, x, y);
             else
                 fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);
         }
         else if (q1 == 0x9000)
         {
             if (q4 == 0x0000)
-                fprintf(f, "0x%04x: SNE V%x, V%x\n", addr, x, y);
+                fprintf(f, "0x%04x: SNE  V%x, V%x\n", addr, x, y);
             else
                 fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);
         }
         else if (q1 == 0xA000)
-            fprintf(f, "0x%04x: LD I, 0x%04x\n", addr, nnn);
+            fprintf(f, "0x%04x: LD   I,  0x%04x\n", addr, nnn);
         else if (q1 == 0xB000)
-            fprintf(f, "0x%04x: JP V0, 0x%04x\n", addr, nnn);
+            fprintf(f, "0x%04x: JP   V0, 0x%04x\n", addr, nnn);
         else if (q1 == 0xC000)
-            fprintf(f, "0x%04x: RND V%x, 0x%02x\n", addr, x, kk);
+            fprintf(f, "0x%04x: RND  V%x, 0x%02x\n", addr, x, kk);
         else if (q1 == 0xD000)
-            fprintf(f, "0x%04x: DRW V%x, V%x, %d\n", addr, x, y, q4);
+            fprintf(f, "0x%04x: DRW  V%x, V%x, %d\n", addr, x, y, q4);
         else if (q1 == 0xE000)
         {
             if (kk == 0x009e)
-                fprintf(f, "0x%04x: SKP V%x\n", addr, x);
+                fprintf(f, "0x%04x: SKP  V%x\n", addr, x);
             else if (kk == 0x009e)
                 fprintf(f, "0x%04x: SKNP V%x\n", addr, x);
             else
@@ -149,23 +155,23 @@ int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size)
         else if (q1 == 0xF000)
         {
             if (kk == 0x07)
-                fprintf(f, "0x%04x: LD V%x, DT\n", addr, x);
+                fprintf(f, "0x%04x: LD   V%x, DT\n", addr, x);
             else if (kk == 0x0a)
-                fprintf(f, "0x%04x: LD V%x, K\n", addr, x);
+                fprintf(f, "0x%04x: LD   V%x, K\n", addr, x);
             else if (kk == 0x15)
-                fprintf(f, "0x%04x: LD DT, V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   DT, V%x\n", addr, x);
             else if (kk == 0x18)
-                fprintf(f, "0x%04x: LD ST, V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   ST, V%x\n", addr, x);
             else if (kk == 0x1e)
-                fprintf(f, "0x%04x: ADD I, V%x\n", addr, x);
+                fprintf(f, "0x%04x: ADD  I, V%x\n", addr, x);
             else if (kk == 0x29)
-                fprintf(f, "0x%04x: LD F, V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   F, V%x\n", addr, x);
             else if (kk == 0x33)
-                fprintf(f, "0x%04x: LD B, V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   B, V%x\n", addr, x);
             else if (kk == 0x55)
-                fprintf(f, "0x%04x: LD [I], V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   [I], V%x\n", addr, x);
             else if (kk == 0x65)
-                fprintf(f, "0x%04x: LD Vx, V%x\n", addr, x);
+                fprintf(f, "0x%04x: LD   V%x, [I]\n", addr, x);
             else
                 fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);
         }

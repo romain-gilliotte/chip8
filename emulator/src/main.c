@@ -49,13 +49,13 @@ int main(const int argc, const char **argv)
     // Init Chip8 & SDL
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "../../roms/demos/Maze [David Winter, 199x].ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("Chip8",
                                           SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED,
-                                          640, 480,
+                                          640, 320,
                                           SDL_WINDOW_RESIZABLE);
 
     SDL_Surface *surface = SDL_GetWindowSurface(window);
@@ -76,7 +76,7 @@ int main(const int argc, const char **argv)
         SDL_UpdateWindowSurface(window);
 
         // Sleep 16ms
-        struct timespec ts = {.tv_sec = 0, .tv_nsec = 32000000};
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 100000000};
         nanosleep(&ts, NULL);
     }
 }

@@ -42,6 +42,16 @@ typedef struct Chip8
     uint16_t stack[16];
 } Chip8;
 
+typedef enum Chip8Error
+{
+    CHIP8_OK,
+    CHIP8_ROM_NOT_FOUND,
+    CHIP8_ROM_TOO_LONG,
+    CHIP8_INVALID_OPCODE,
+    CHIP8_CALL_STACK_EMPTY,
+    CHIP8_CALL_STACK_FULL,
+} Chip8Error;
+
 /**
  * Initialize the Chip8 struct
  */

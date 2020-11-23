@@ -6,7 +6,9 @@ It aims to be a working interpreter and a dynamic recompiler for Chip8 in C.
 
 # Goals
 
-This project's goal is to learn modern C/C++ and associated tooling (build, delivery, dependency management, testing, ...).
+We're in 2020, no one needs a chip8 emulator, and besides, dozens are already available on the internet for all kinds of platforms.
+
+This project's goal is to learn modern C/C++ tooling (build, delivery, dependency management, testing, ...).
 
 As a warning, my last time using C for anything was C99 in school a decade ago.
 The stack we used back then was Emacs, hand-crafted Makefiles, GCC and GDB, all in command line on FreeBSD computers. There was no dependency management, no unit testing and so on...
@@ -19,7 +21,9 @@ Some milestones for this project.
 
 - [x] Basic build system with CMake
 - [x] Unit testing
-- [ ] Interpreter, graphics, input.
+- [x] Interpreter: CPU
+- [x] Interpreter: graphics
+- [ ] Interpreter: input
 - [ ] Quality: Linter?
 - [ ] Recompiler for a couple of supported instructions (it's ok to fallback to the interpreter all the time)
 - [ ] Write NodeJS native library
@@ -51,7 +55,10 @@ This section contains resources I'm using.
 ## About Chip8 itself
 
 http://emulator101.com/
+
 http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+
+http://mattmik.com/files/chip8/mastering/chip8.html
 
 ## About Dependencies
 
@@ -70,6 +77,12 @@ https://cmake.org/documentation/
 https://www.youtube.com/playlist?list=PLK6MXr8gasrGmIiSuVQXpfFuE1uPT615s
 
 https://www.youtube.com/watch?v=y7ndUhdQuU8
+
+https://www.youtube.com/watch?v=y9kSr5enrSk
+
+https://cliutils.gitlab.io/modern-cmake/
+
+https://cgold.readthedocs.io/en/latest/
 
 ### Cmocka
 

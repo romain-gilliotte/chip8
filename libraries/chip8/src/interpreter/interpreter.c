@@ -4,17 +4,6 @@
 #include "interpreter.h"
 
 /**
- * 0nnn - SYS addr
- * Jump to a machine code routine at nnn.
- * 
- * This instruction is only used on the old computers on which Chip-8 was originally implemented. It is ignored by modern interpreters.
- */
-static void exec_0nnn(Chip8 *state)
-{
-    state->PC += 2;
-}
-
-/**
  * 00E0 - CLS
  * Clear the display.
  */
@@ -32,8 +21,8 @@ static void exec_00e0(Chip8 *state)
  */
 static void exec_00ee(Chip8 *state)
 {
-    state->PC = state->stack[state->SP];
     state->SP--;
+    state->PC = state->stack[state->SP] + 2;
 }
 
 /**
@@ -59,8 +48,8 @@ static void exec_2nnn(Chip8 *state)
 {
     uint16_t addr = ((uint16_t)(state->memory[state->PC] & 0x0F) << 8) + state->memory[state->PC + 1];
 
-    state->SP++;
     state->stack[state->SP] = state->PC;
+    state->SP++;
     state->PC = addr;
 }
 
@@ -336,7 +325,7 @@ static void exec_cxkk(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
 
-    state->registers[x] = state->memory[state->PC + 1] & (rand() % 256);
+    state->registers[x] = state->memory[state->PC + 1] & rand();
     state->PC += 2;
 }
 
@@ -356,8 +345,8 @@ static void exec_cxkk(Chip8 *state)
  */
 static void exec_dxyn(Chip8 *state)
 {
-    uint8_t x0 = state->memory[state->PC] & 0x0F;
-    uint8_t y0 = state->memory[state->PC + 1] & 0x0F0 >> 4;
+    uint8_t x0 = state->registers[state->memory[state->PC] & 0x0F];
+    uint8_t y0 = state->registers[(state->memory[state->PC + 1] >> 4) & 0x0F];
     uint8_t n = state->memory[state->PC + 1] & 0x0F;
 
     state->registers[15] = 0;
@@ -366,7 +355,7 @@ static void exec_dxyn(Chip8 *state)
         for (int x = 0; x < 8; ++x)
         {
             uint16_t position = (y0 + y) * state->screen_width + x0 + x;
-            uint8_t new_pixel = 1 & (state->memory[state->I + y] >> (8 - x));
+            uint8_t new_pixel = 1 & (state->memory[state->I + y] >> (7 - x));
 
             state->registers[15] |= new_pixel & state->display[position];
             state->display[position] ^= new_pixel;
@@ -526,9 +515,10 @@ static void exec_fx55(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
 
-    for (int i = 0; i < x; ++i)
+    for (int i = 0; i <= x; ++i)
         state->memory[state->I + i] = state->registers[i];
 
+    state->I += x + 1;
     state->PC += 2;
 }
 
@@ -542,15 +532,16 @@ static void exec_fx65(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
 
-    for (int i = 0; i < x; ++i)
+    for (int i = 0; i <= x; ++i)
         state->registers[i] = state->memory[state->I + i];
 
+    state->I += x + 1;
     state->PC += 2;
 }
 
 int chip8_run(Chip8 *state, uint64_t microtime)
 {
-    uint64_t expected_cc = microtime * state->clock_speed / 1e6;
+    uint64_t expected_cc = microtime * state->clock_speed / 1000000;
 
     int result = 0;
     while (!result && state->cycle_counts < expected_cc)
@@ -563,6 +554,8 @@ int chip8_run(Chip8 *state, uint64_t microtime)
 
 int chip8_step(Chip8 *state)
 {
+    // chip8_disassemble(stdout, state->memory + state->PC, 2);
+
     // Run current opcode.
     uint16_t opcode = ((uint16_t)state->memory[state->PC] << 8) | state->memory[state->PC + 1];
 
@@ -579,8 +572,7 @@ int chip8_step(Chip8 *state)
             exec_00ee(state);
             break;
         default:
-            exec_0nnn(state);
-            break;
+            return CHIP8_INVALID_OPCODE;
         }
         break;
 
@@ -597,10 +589,11 @@ int chip8_step(Chip8 *state)
         exec_4xkk(state);
         break;
     case 0x5000:
-        if (opcode & 0x000F == 0)
+
+        if ((opcode & 0x000F) == 0)
             exec_5xy0(state);
         else
-            return 1;
+            return CHIP8_INVALID_OPCODE;
         break;
 
     case 0x6000:
@@ -640,7 +633,7 @@ int chip8_step(Chip8 *state)
             exec_8xye(state);
             break;
         default:
-            return 1;
+            return CHIP8_INVALID_OPCODE;
         }
         break;
     case 0x9000:
@@ -650,7 +643,7 @@ int chip8_step(Chip8 *state)
             exec_9xy0(state);
             break;
         default:
-            return 1;
+            return CHIP8_INVALID_OPCODE;
         }
         break;
     case 0xA000:
@@ -675,7 +668,7 @@ int chip8_step(Chip8 *state)
             exec_exa1(state);
             break;
         default:
-            return 1;
+            return CHIP8_INVALID_OPCODE;
         }
         break;
     case 0xF000:
@@ -709,7 +702,7 @@ int chip8_step(Chip8 *state)
             exec_fx65(state);
             break;
         default:
-            return 1;
+            return CHIP8_INVALID_OPCODE;
         }
         break;
     }
