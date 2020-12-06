@@ -45,7 +45,7 @@ static void test_00e0(void **state)
 
     chip->display[43] = 1;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->display[43], 0);
 }
 
@@ -57,7 +57,7 @@ static void test_00ee(void **state)
     chip->stack[0] = 0x250; // Return address
     chip->SP = 1;           // Stack Pointer
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->SP, 0);     // Stack Pointer
     assert_int_equal(chip->PC, 0x252); // Program Count
 }
@@ -67,7 +67,7 @@ static void test_1nnn(void **state)
 {
     Chip8 *chip = load_simple_program(state, 0x1210);
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->PC, 0x210);
 }
 
@@ -76,7 +76,7 @@ static void test_2nnn(void **state)
 {
     Chip8 *chip = load_simple_program(state, 0x2250);
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->stack[0], 0x200); // Return address
     assert_int_equal(chip->SP, 1);           // Stack Pointer
     assert_int_equal(chip->PC, 0x250);       // Program Count
@@ -88,7 +88,7 @@ static void test_3xkk_equal(void **state)
     Chip8 *chip = load_simple_program(state, 0x3201);
 
     chip->registers[2] = 0x01;
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->PC, 0x204);
 }
 
@@ -97,7 +97,7 @@ static void test_3xkk_notequal(void **state)
     Chip8 *chip = load_simple_program(state, 0x3201);
 
     chip->registers[2] = 0x10;
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->PC, 0x202);
 }
 
@@ -236,7 +236,7 @@ static void test_annn(void **state)
 {
     Chip8 *chip = load_simple_program(state, 0xa21e);
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->I, 0x021e);
     assert_int_equal(chip->PC, 0x202);
 }
@@ -254,7 +254,7 @@ static void test_cxkk(void **state)
 
     Chip8 *chip = load_simple_program(state, 0xc2f0);
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[2], 0x60);
     assert_int_equal(chip->PC, 0x202);
 }
@@ -272,7 +272,7 @@ static void test_dxyn_simple(void **state)
     chip->memory[0x0401] = 34; // binary: 0010 0010
     chip->memory[0x0402] = 56; // binary: 0011 1000
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
 
     // Test byte one of the sprite
     assert_int_equal(chip->display[64 * 3 + 3], 0);
