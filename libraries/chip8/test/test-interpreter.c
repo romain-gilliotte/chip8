@@ -125,7 +125,7 @@ static void test_7xkk_simple(void **state)
     Chip8 *chip = load_simple_program(state, 0x7210);
     chip->registers[2] = 0x10;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[2], 0x20);
     assert_int_equal(chip->registers[15], 0x00);
     assert_int_equal(chip->PC, 0x202);
@@ -138,7 +138,7 @@ static void test_7xkk_overflow(void **state)
     chip->registers[2] = 0xff;
     chip->registers[15] = 0x12;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[2], 0x0f);
     assert_int_equal(chip->registers[15], 0x12); // As per documentation, no carry should be generated
     assert_int_equal(chip->PC, 0x202);
@@ -150,7 +150,7 @@ static void test_8xy0(void **state)
     Chip8 *chip = load_simple_program(state, 0x8230);
 
     chip->registers[3] = 0x10;
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[2], 0x10);
     assert_int_equal(chip->registers[3], 0x10);
     assert_int_equal(chip->PC, 0x202);
@@ -181,7 +181,7 @@ static void test_8xy4_simple(void **state)
     chip->registers[1] = 0x10;
     chip->registers[2] = 0x20;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[1], 0x30);
     assert_int_equal(chip->registers[2], 0x20);
     assert_int_equal(chip->registers[15], 0x00);
@@ -194,7 +194,7 @@ static void test_8xy4_overflow(void **state)
     chip->registers[1] = 0x10;
     chip->registers[2] = 0xff;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[1], 0x0f);
     assert_int_equal(chip->registers[2], 0xff);
     assert_int_equal(chip->registers[15], 0x01);
@@ -353,7 +353,7 @@ static void test_fx33(void **state)
     chip->I = 1024; // Can be any number other than 0x200 to avoid overwriting the opcode.
     chip->registers[2] = 127;
 
-    assert_int_equal(chip8_step(chip), 0);
+    assert_int_equal(interpreter_step(chip), 0);
     assert_int_equal(chip->registers[2], 127);
     assert_int_equal(chip->memory[chip->I], 1);
     assert_int_equal(chip->memory[chip->I + 1], 2);

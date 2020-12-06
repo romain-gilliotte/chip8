@@ -539,20 +539,20 @@ static void exec_fx65(Chip8 *state)
     state->PC += 2;
 }
 
-int chip8_run(Chip8 *state, uint64_t microtime)
+int interpreter_run(Chip8 *state, uint64_t microtime)
 {
     uint64_t expected_cc = microtime * state->clock_speed / 1000000;
 
     int result = 0;
     while (!result && state->cycle_counts < expected_cc)
     {
-        result = chip8_step(state);
+        result = interpreter_step(state);
     }
 
     return result;
 }
 
-int chip8_step(Chip8 *state)
+int interpreter_step(Chip8 *state)
 {
     // chip8_disassemble(stdout, state->memory + state->PC, 2);
 

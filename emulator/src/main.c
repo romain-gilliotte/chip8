@@ -16,21 +16,25 @@ static int process_events(Chip8 *state)
 }
 
 /** Redraw full screen at each frame */
-static void render(SDL_Surface *surface, Chip8 *state)
+static void render(SDL_Window *window, Chip8 *state)
 {
-    const uint32_t width = surface->w;
-    const uint32_t height = surface->h;
+    SDL_Surface *surface = SDL_GetWindowSurface(window);
+
+    uint32_t width = surface->w;
+    uint32_t height = surface->h;
     uint32_t *pixels = surface->pixels;
 
     for (uint32_t i = 0; i < width * height; ++i)
     {
-        const uint32_t x_window = i % width;
-        const uint32_t y_window = i / width;
-        const uint32_t x_chip8 = x_window * state->screen_width / width;
-        const uint32_t y_chip8 = y_window * state->screen_height / height;
+        uint32_t x_window = i % width;
+        uint32_t y_window = i / width;
+        uint32_t x_chip8 = x_window * state->screen_width / width;
+        uint32_t y_chip8 = y_window * state->screen_height / height;
 
         pixels[i] = state->display[y_chip8 * state->screen_width + x_chip8] ? 0xffffffff : 0;
     }
+
+    SDL_UpdateWindowSurface(window);
 }
 
 static uint64_t get_elapsed(struct timeval *begin)
@@ -58,7 +62,7 @@ int main(const int argc, const char **argv)
                                           640, 320,
                                           SDL_WINDOW_RESIZABLE);
 
-    SDL_Surface *surface = SDL_GetWindowSurface(window);
+    
 
     // Loop
     struct timeval begin;
@@ -68,12 +72,10 @@ int main(const int argc, const char **argv)
         process_events(&state);
 
         double elapsed = get_elapsed(&begin);
-        if (chip8_run(&state, elapsed))
+        if (interpreter_run(&state, elapsed))
             return 1;
 
-        render(surface, &state);
-
-        SDL_UpdateWindowSurface(window);
+        render(window, &state);
 
         // Sleep 16ms
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 100000000};

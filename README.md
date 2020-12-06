@@ -25,15 +25,15 @@ Some milestones for this project.
 - [x] Interpreter: graphics
 - [ ] Interpreter: input
 - [ ] Quality: Linter?
-- [ ] Recompiler for a couple of supported instructions (it's ok to fallback to the interpreter all the time)
+- [ ] Recompiler supporting some instructions written by hand
 - [ ] Write NodeJS native library
 - [ ] Write CPython native library
 - [ ] Cross-compilation: Make this work in both windows / linux
 - [ ] Delivery: Distro packages, flatpak, windows installers...
 - [ ] Dependency management: Nuget? Conan? How to use/bundle recent versions of dependencies? npm's package.json equivalent?
 - [ ] CI/CD: What are the industry standart CI/CD systems for C/C++?
-- [ ] Recompiler supporting most instructions
-- [ ] Use LLVM instead of x86?
+- [ ] Recompiler using asmjit?
+- [ ] Recompiler using LLVM?
 
 # Doc
 
@@ -59,6 +59,33 @@ http://emulator101.com/
 http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
 http://mattmik.com/files/chip8/mastering/chip8.html
+
+## About Emulation
+
+### x64 instruction encoding
+
+http://www.c-jump.com/CIS77/CPU/x86/lecture.html#X77_0010_real_encoding
+
+
+### x86 adressing
+
+https://www.youtube.com/watch?v=t44pm0GzKvk
+
+https://www.youtube.com/watch?v=XOnzjEd_dLg
+
+### JIT
+
+https://eli.thegreenplace.net/2013/11/05/how-to-jit-an-introduction
+
+https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/
+
+https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-2-an-x64-jit/
+
+https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-3-llvm/
+
+https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-4-in-python/
+
+http://www.multigesture.net/wp-content/uploads/mirror/zenogais/Dynamic%20Recompiler.html
 
 ## About Dependencies
 
