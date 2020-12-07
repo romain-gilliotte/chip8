@@ -1,6 +1,7 @@
 #pragma once
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct Chip8
 {
@@ -17,6 +18,7 @@ typedef struct Chip8
     ////////////
 
     uint32_t cycle_counts;
+    bool display_dirty;
 
     ////////////
     // Machine state

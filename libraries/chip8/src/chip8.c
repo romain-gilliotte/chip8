@@ -147,7 +147,7 @@ int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size)
         {
             if (kk == 0x009e)
                 fprintf(f, "0x%04x: SKP  V%x\n", addr, x);
-            else if (kk == 0x009e)
+            else if (kk == 0x00a1)
                 fprintf(f, "0x%04x: SKNP V%x\n", addr, x);
             else
                 fprintf(f, "0x%04x: Invalid opcode: 0x%04x\n", addr, opcode);

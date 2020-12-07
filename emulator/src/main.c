@@ -1,18 +1,43 @@
 #include <errno.h>
-#include <time.h>
 #include <sys/time.h>
 #include <SDL2/SDL.h>
 #include <chip8.h>
 #include <interpreter/interpreter.h>
 
-static int process_events(Chip8 *state)
+static bool process_events(Chip8 *state)
 {
     SDL_Event e;
-    while (SDL_PollEvent(&e) > 0)
-    {
+
+    while (SDL_PollEvent(&e) > 0) {
+        switch (e.type) {
+            case SDL_QUIT:
+                return true;
+
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+                switch (e.key.keysym.sym) {
+                    case SDLK_1: state->keyboard[0x1] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_2: state->keyboard[0x2] = e.type == SDL_KEYDOWN; break; 
+                    case SDLK_3: state->keyboard[0x3] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_4: state->keyboard[0xC] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_q: state->keyboard[0x4] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_w: state->keyboard[0x5] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_e: state->keyboard[0x6] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_r: state->keyboard[0xD] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_a: state->keyboard[0x7] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_s: state->keyboard[0x8] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_d: state->keyboard[0x9] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_f: state->keyboard[0xE] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_z: state->keyboard[0xA] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_x: state->keyboard[0x0] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_c: state->keyboard[0xB] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_v: state->keyboard[0xF] = e.type == SDL_KEYDOWN; break;
+                }
+                break;
+        }
     }
 
-    return 0;
+    return false;
 }
 
 /** Redraw full screen at each frame */
@@ -37,48 +62,42 @@ static void render(SDL_Window *window, Chip8 *state)
     SDL_UpdateWindowSurface(window);
 }
 
-static uint64_t get_elapsed(struct timeval *begin)
-{
-    struct timeval end;
-
-    gettimeofday(&end, 0);
-    long seconds = end.tv_sec - begin->tv_sec;
-    long microseconds = end.tv_usec - begin->tv_usec;
-
-    return seconds * 1000000 + microseconds;
-}
 
 int main(const int argc, const char **argv)
 {
     // Init Chip8 & SDL
     Chip8 state;
-    chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    chip8_init(&state, 64, 32, 50000);
+    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/games/Coin Flipping [Carmelo Cortez, 1978].ch8");
 
     SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window *window = SDL_CreateWindow("Chip8",
-                                          SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED,
-                                          640, 320,
-                                          SDL_WINDOW_RESIZABLE);
-
-    
+    SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
 
     // Loop
-    struct timeval begin;
-    gettimeofday(&begin, 0);
-    while (1)
+    bool finished = false;
+    uint32_t started_at = SDL_GetTicks();
+    while (!finished)
     {
-        process_events(&state);
+        // Process events.
+        finished = process_events(&state);
 
-        double elapsed = get_elapsed(&begin);
-        if (interpreter_run(&state, elapsed))
+        // Run Chip8
+        uint32_t ticks = SDL_GetTicks() - started_at;
+        if (interpreter_run(&state, ticks))
             return 1;
 
-        render(window, &state);
+        // Render
+        if (state.display_dirty) {
+            render(window, &state);
+            state.display_dirty = false;
+        }
 
-        // Sleep 16ms
-        struct timespec ts = {.tv_sec = 0, .tv_nsec = 100000000};
-        nanosleep(&ts, NULL);
+        SDL_Delay(1);
     }
+
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+    return 0;
 }

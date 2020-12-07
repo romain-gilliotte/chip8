@@ -362,6 +362,7 @@ static void exec_dxyn(Chip8 *state)
         }
     }
 
+    state->display_dirty = true;
     state->PC += 2;
 }
 
@@ -375,7 +376,7 @@ static void exec_ex9e(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
 
-    state->PC += state->keyboard[x] ? 4 : 2;
+    state->PC += state->keyboard[state->registers[x]] ? 4 : 2;
 }
 
 /**
@@ -388,7 +389,7 @@ static void exec_exa1(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
 
-    state->PC += state->keyboard[x] ? 2 : 4;
+    state->PC += state->keyboard[state->registers[x]] ? 2 : 4;
 }
 
 /**
@@ -539,9 +540,9 @@ static void exec_fx65(Chip8 *state)
     state->PC += 2;
 }
 
-int interpreter_run(Chip8 *state, uint64_t microtime)
+int interpreter_run(Chip8 *state, uint32_t ticks)
 {
-    uint64_t expected_cc = microtime * state->clock_speed / 1000000;
+    uint64_t expected_cc = ticks * state->clock_speed / 1000;
 
     int result = 0;
     while (!result && state->cycle_counts < expected_cc)
