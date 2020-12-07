@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-typedef struct Chip8
+typedef struct
 {
     ////////////
     // Configuration
@@ -44,7 +44,7 @@ typedef struct Chip8
     uint16_t stack[16];
 } Chip8;
 
-typedef enum Chip8Error
+typedef enum
 {
     CHIP8_OK,
     CHIP8_ROM_NOT_FOUND,
@@ -54,14 +54,22 @@ typedef enum Chip8Error
     CHIP8_CALL_STACK_FULL,
 } Chip8Error;
 
+typedef enum  {
+    INTERPRETER,
+    RECOMPILER
+} Engine;
+
 /**
  * Initialize the Chip8 struct
+ * 
+ * @param state Pointer to a newly allocated Chip8.
+ * @param width Desired width of the screen. 64 for the original chip8.
+ * @param height Desired height of the screen. 48 for the original chip8.
+ * @param clock_speed Clock speed in Hz. 500 for the original chip8.
+ * @returns 
  */
 int chip8_init(Chip8 *state, int width, int height, int clock_speed);
-
 int chip8_load_rom(Chip8 *state, const char *rom);
-
-int chip8_disassemble(FILE *f, uint8_t *program, uint32_t size);
-
-int chip8_dump(FILE *f, Chip8 *state);
-int chip8_restore(FILE *f, Chip8 *state);
+int chip8_disassemble(Chip8 *state, FILE *f);
+int chip8_dump(Chip8 *state, FILE *f);
+int chip8_restore(Chip8 *state, FILE *f);

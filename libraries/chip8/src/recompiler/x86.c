@@ -1,26 +1,26 @@
 #include <sys/mman.h>
 #include <stdio.h>
-#include "jitfn.h"
+#include "x86.h"
 
 /////////
 // Helpers
 /////////
 
 /** Append a byte, and increment pointer */ 
-static void append_byte(JitFn* jitfn, uint8_t byte) {
-	jitfn->buffer[jitfn->buffer_ptr++] = byte;
+static void push_byte(X86fn* func, uint8_t byte) {
+	func->buffer[func->buffer_ptr++] = byte;
 }
 
 /** Append a word, and increment pointer */
-static void append_word(JitFn* jitfn, uint16_t word) {
-	*((uint16_t*)(jitfn->buffer + jitfn->buffer_ptr)) = word;
-	jitfn->buffer_ptr += 2;
+static void push_word(X86fn* func, uint16_t word) {
+	*((uint16_t*)(func->buffer + func->buffer_ptr)) = word;
+	func->buffer_ptr += 2;
 }
 
 /** Append a dword, and increment pointer */
-static void append_dword(JitFn* jitfn, uint32_t dword) {
-	*((uint32_t*)(jitfn->buffer + jitfn->buffer_ptr)) = dword;
-	jitfn->buffer_ptr += 4;
+static void push_dword(X86fn* func, uint32_t dword) {
+	*((uint32_t*)(func->buffer + func->buffer_ptr)) = dword;
+	func->buffer_ptr += 4;
 }
 
 
@@ -29,7 +29,7 @@ static void append_dword(JitFn* jitfn, uint32_t dword) {
 //  *      0 => mob reg2, reg1 
 //  *      1 => mov reg1, reg2
 //  */
-// static void append_regdirect(CodeBlock* jitfn, Register reg1, Register reg2) {
+// static void append_regdirect(CodeBlock* func, X86reg reg1, X86reg reg2) {
 //     uint8_t modrm = (0b11 << 6) | (reg1 << 3) | reg2;
 
 //     if (reg1 < 8 && reg2 < 8) {
@@ -38,7 +38,7 @@ static void append_dword(JitFn* jitfn, uint32_t dword) {
 
     
 
-//     append_byte(modrm)
+//     push_byte(modrm)
 // }
 
 
@@ -58,21 +58,21 @@ static void append_dword(JitFn* jitfn, uint32_t dword) {
  * @see https://datacadamia.com/lang/assembly/intel/modrm
  * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
  */
-static void append_modrm(JitFn* jitfn, uint8_t mod, uint8_t rm, Register reg)
+static void push_modrm(X86fn* func, uint8_t mod, uint8_t rm, X86reg reg)
 {
     uint8_t byte = (mod << 6) | (reg << 4) | rm;
 
-	append_byte(jitfn, byte);
+	push_byte(func, byte);
 }
 
 /**
  * @see https://datacadamia.com/lang/assembly/intel/modrm
  * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#SIB
  */
-static void append_sibsb(JitFn* jitfn, uint8_t sib, uint8_t rm, uint8_t index)
+static void push_sibsb(X86fn* func, uint8_t sib, uint8_t rm, uint8_t index)
 {
     uint8_t byte = (sib << 6) | (rm << 4) | index;
-	append_byte(jitfn, byte);
+	push_byte(func, byte);
 }
 
 
@@ -89,9 +89,9 @@ static void append_sibsb(JitFn* jitfn, uint8_t sib, uint8_t rm, uint8_t index)
  * 
  * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#REX_prefix
  */
-static void append_rexprefix(JitFn* jitfn, bool w, bool r, bool x, bool b) {
+static void push_rexprefix(X86fn* func, bool w, bool r, bool x, bool b) {
     uint8_t byte = 0b01000000 | (w << 3) | (r << 2) | (x << 1) | b;
-	append_byte(jitfn, byte);
+	push_byte(func, byte);
 }
 
 
@@ -99,12 +99,12 @@ static void append_rexprefix(JitFn* jitfn, bool w, bool r, bool x, bool b) {
 // Init & run
 /////////
 
-int jitfn_init(JitFn* jitfn, uint32_t size) {
-    jitfn->buffer = (uint8_t*) mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    jitfn->buffer_ptr = 0;
-    jitfn->buffer_size = size;
+int x86_init(X86fn* func, uint32_t size) {
+    func->buffer = (uint8_t*) mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    func->buffer_ptr = 0;
+    func->buffer_size = size;
 
-    if ((int) jitfn->buffer == -1) {
+    if ((int) func->buffer == -1) {
         perror("mmap");
         return -1;
     }
@@ -112,22 +112,22 @@ int jitfn_init(JitFn* jitfn, uint32_t size) {
     return 0;
 }
 
-int jitfn_lock(JitFn* jitfn) {
-    if (mprotect(jitfn->buffer, jitfn->buffer_size, PROT_READ | PROT_EXEC) == -1) {
+int x86_lock(X86fn* func) {
+    if (mprotect(func->buffer, func->buffer_size, PROT_READ | PROT_EXEC) == -1) {
         perror("mprotect");
         return -1;
     }
 
-    jitfn->executable = true;
+    func->executable = true;
 }
 
-int jitfn_run(JitFn* jitfn) {
-    if (!jitfn->executable) {
+int x86_run(X86fn* func) {
+    if (!func->executable) {
         return -1;
     }
 
     // What about calling conventions?
-    void (*fn)() = (void(*)()) jitfn->buffer;
+    void (*fn)() = (void(*)()) func->buffer;
     fn();
 
     return 0;
@@ -138,18 +138,11 @@ int jitfn_run(JitFn* jitfn) {
 /////////
 
 
-void jitfn_append_mov_immtoreg(JitFn* jitfn, uint8_t src_imm, Register dst_reg) {
+void x86_mov_regimm32(X86fn* func, X86reg dst_reg, uint32_t src_imm) {
+    push_byte(func, 0xB8 | dst_reg);
+    push_dword(func, src_imm);
 }
 
-void cb_append_mov_regtomem(JitFn* jitfn, Register src_reg, uint32_t dst_addr) {
-
-}
-
-void cb_append_mov_memtoreg(JitFn* jitfn, uint32_t src_addr, Register dst_reg) {
-
-}
-
-
-void jitfn_append_ret(JitFn* jitfn) {
-
+void x86_retn(X86fn* func) {
+    push_byte(func, 0xC3);
 }

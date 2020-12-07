@@ -23,7 +23,7 @@ Some milestones for this project.
 - [x] Unit testing
 - [x] Interpreter: CPU
 - [x] Interpreter: graphics
-- [ ] Interpreter: input
+- [x] Interpreter: input
 - [ ] Quality: Linter?
 - [ ] Recompiler supporting some instructions written by hand
 - [ ] Write NodeJS native library

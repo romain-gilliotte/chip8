@@ -1,11 +1,41 @@
+#include <stdlib.h>
 #include <inttypes.h>
-#include "cache.h"
+#include "recompiler.h"
+#include "../chip8.h"
+#include "../interpreter/interpreter.h"
 
-int create_cache(Chip8* state, CodeCache* cache) {
+int recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks) {
+    uint64_t expected_cc = ticks * state->clock_speed / 1000;
+
+    while (state->cycle_counts < expected_cc)
+    {
+        CodeCache* cache = repository->caches[state->PC];
+
+        // Compile code of the required section if needed.
+        if (!cache) {
+            cache = (CodeCache*) malloc(sizeof(CodeCache));
+            cache_create(state, cache);
+            repository->caches[state->PC] = cache;
+        }
+
+        // Run section.
+        int error = x86_run(&cache->code);
+        if (error < 0) {
+            if (error == USE_INTERPRETER) 
+                interpreter_step(state);
+            else
+                return -1;
+        }
+    }
+
+    return 0;
+}
+
+int cache_create(Chip8* state, CodeCache* cache) {
     cache->start = state->PC;
     cache->end = state->PC;
 
-    jitfn_init(&cache->code, 4096);
+    x86_init(&cache->code, 4096);
 
     while (!cache->code.executable) {
         uint16_t opcode = *(uint16_t*) (state->memory + cache->end);
@@ -17,9 +47,9 @@ int create_cache(Chip8* state, CodeCache* cache) {
 
 
 static int encode(CodeCache* cache, uint16_t opcode) {
-    jitfn_append_mov_immtoreg(&cache->code, USE_INTERPRETER, AL);
-    jitfn_append_ret(&cache->code);
-    jitfn_lock(&cache->code);
+    x86_mov_regimm32(&cache->code, AL, USE_INTERPRETER);
+    x86_retn(&cache->code);
+    x86_lock(&cache->code);
 }
 
 

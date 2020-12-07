@@ -43,6 +43,7 @@ static bool process_events(Chip8 *state)
 /** Redraw full screen at each frame */
 static void render(SDL_Window *window, Chip8 *state)
 {
+    chip8_init()
     SDL_Surface *surface = SDL_GetWindowSurface(window);
 
     uint32_t width = surface->w;
@@ -67,9 +68,8 @@ int main(const int argc, const char **argv)
 {
     // Init Chip8 & SDL
     Chip8 state;
-    chip8_init(&state, 64, 32, 50000);
-    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/games/Coin Flipping [Carmelo Cortez, 1978].ch8");
+    chip8_init(&state, 64, 32, 500);
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
 
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);

@@ -1,10 +1,9 @@
 #pragma once
-#include "jitfn.h"
+#include "x86.h"
 #include "../chip8.h"
 
 typedef struct {
-    JitFn code;
-
+    X86fn code;
     uint16_t start;
     uint16_t end;
 
@@ -24,4 +23,5 @@ typedef enum {
     
 } CacheReturnCode;
 
-int create_cache(Chip8* state, CodeCache* cache);
+int recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks);
+int cache_create(Chip8* state, CodeCache* cache);
