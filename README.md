@@ -25,7 +25,7 @@ Some milestones for this project.
 - [x] Interpreter: graphics
 - [x] Interpreter: input
 - [ ] Quality: Linter?
-- [ ] Recompiler supporting some instructions written by hand
+- [x] Recompiler supporting some instructions written by hand
 - [ ] Write NodeJS native library
 - [ ] Write CPython native library
 - [ ] Cross-compilation: Make this work in both windows / linux
