@@ -3,6 +3,7 @@
 #include <SDL2/SDL.h>
 #include <chip8.h>
 #include <interpreter/interpreter.h>
+#include <recompiler/recompiler.h>
 
 static bool process_events(Chip8 *state)
 {
@@ -43,7 +44,6 @@ static bool process_events(Chip8 *state)
 /** Redraw full screen at each frame */
 static void render(SDL_Window *window, Chip8 *state)
 {
-    chip8_init()
     SDL_Surface *surface = SDL_GetWindowSurface(window);
 
     uint32_t width = surface->w;
@@ -74,6 +74,9 @@ int main(const int argc, const char **argv)
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
 
+    CodeCacheRepository repository;
+    recompiler_init(&repository);
+
     // Loop
     bool finished = false;
     uint32_t started_at = SDL_GetTicks();
@@ -84,7 +87,8 @@ int main(const int argc, const char **argv)
 
         // Run Chip8
         uint32_t ticks = SDL_GetTicks() - started_at;
-        if (interpreter_run(&state, ticks))
+        // if (interpreter_run(&state, ticks))
+        if (recompiler_run(&repository, &state, ticks))
             return 1;
 
         // Render

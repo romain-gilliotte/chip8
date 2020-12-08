@@ -23,26 +23,11 @@ static void push_dword(X86fn* func, uint32_t dword) {
 	func->buffer_ptr += 4;
 }
 
-
-// /**
-//  * Depending on opcode.direction ("d field")
-//  *      0 => mob reg2, reg1 
-//  *      1 => mov reg1, reg2
-//  */
-// static void append_regdirect(CodeBlock* func, X86reg reg1, X86reg reg2) {
-//     uint8_t modrm = (0b11 << 6) | (reg1 << 3) | reg2;
-
-//     if (reg1 < 8 && reg2 < 8) {
-        
-//     }
-
-    
-
-//     push_byte(modrm)
-// }
-
-
-
+/** Append a qword, and increment pointer */
+static void push_qword(X86fn* func, uint64_t qword) {
+	*((uint64_t*)(func->buffer + func->buffer_ptr)) = qword;
+	func->buffer_ptr += 8;
+}
 
 /**
  * The ModR/M byte allows to refer to a register or is a part of an instruction used when a memory operand is used.
@@ -53,7 +38,7 @@ static void push_dword(X86fn* func, uint32_t dword) {
  * When mod == b11 -> register-direct addressing mode is used
  *          != b11 -> register-indirect addressing mode is used
  *      
- * @example modrm(mod=0b11, reg=AL, rm=0)
+ * @example modrm(mod=0b11, reg=EAX, rm=0)
  * 
  * @see https://datacadamia.com/lang/assembly/intel/modrm
  * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM
@@ -76,24 +61,10 @@ static void push_sibsb(X86fn* func, uint8_t sib, uint8_t rm, uint8_t index)
 }
 
 
-/**
- * In the ModR/M byte, reg being 3 bits is inconvenient, because we can't access registers R8L->R15L
- * In order to do so, we need to use the "REX" prefix.
- * 
- * The same goes for the MODRM.rm, SIG.index and SIB.base fields, which are extended here.
- * 
- * - W: When 1, a 64-bit operand size is used. Otherwise, when 0, the default operand size is used.
- * - R: This 1-bit value is an extension to the MODRM.reg field.
- * - X: This 1-bit value is an extension to the SIB.index field.
- * - B: This 1-bit value is an extension to the MODRM.rm field or the SIB.base field.
- * 
- * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#REX_prefix
- */
-static void push_rexprefix(X86fn* func, bool w, bool r, bool x, bool b) {
+static void push_rex(X86fn* func, bool w, bool r, bool x, bool b) {
     uint8_t byte = 0b01000000 | (w << 3) | (r << 2) | (x << 1) | b;
-	push_byte(func, byte);
+    push_byte(func, byte);
 }
-
 
 /////////
 // Init & run
@@ -103,8 +74,9 @@ int x86_init(X86fn* func, uint32_t size) {
     func->buffer = (uint8_t*) mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     func->buffer_ptr = 0;
     func->buffer_size = size;
+    func->executable = false;
 
-    if ((int) func->buffer == -1) {
+    if (func->buffer == MAP_FAILED) {
         perror("mmap");
         return -1;
     }
@@ -127,20 +99,91 @@ int x86_run(X86fn* func) {
     }
 
     // What about calling conventions?
-    void (*fn)() = (void(*)()) func->buffer;
-    fn();
-
-    return 0;
+    int (*fn)() = (int (*)()) func->buffer;
+    return fn();
 }
 
 /////////
 // Instructions
 /////////
 
+void x86_mov_regimm32(X86fn* func, X86reg reg, uint32_t imm) {
+    bool rex_r = reg >> 3;
+    reg = reg & 0x1F;
 
-void x86_mov_regimm32(X86fn* func, X86reg dst_reg, uint32_t src_imm) {
-    push_byte(func, 0xB8 | dst_reg);
-    push_dword(func, src_imm);
+    if (rex_r)
+        push_rex(func, 0, rex_r, 0, 0);    
+
+    push_byte(func, 0xB8 | reg);
+    push_dword(func, imm);
+}
+
+void x86_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
+    bool rex_r = reg >> 3;
+    reg = reg & 0x1F;
+
+    push_rex(func, 1, rex_r, 0, 0);
+    push_byte(func, 0xB8 | reg); // mov r16/32/64, imm16/32/64
+    push_qword(func, imm);
+}
+
+void x86_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int16_t displacement) {
+    // rex prefix only needed if we use R8...15 registers
+    bool rex_b = ptr >> 3;
+    bool rex_r = ptr >> 3;
+    reg = reg & 0x1F;
+    ptr = ptr & 0x1F;
+
+    if (rex_b || rex_r) {
+        push_rex(func, 0, rex_r, 0, rex_b);
+    }
+
+    // instruction
+    push_byte(func, 0x8A);
+    
+    // modrm + displacement
+    if (displacement < 256) { // compiler seems to consider the limit is 127
+        push_modrm(func, 0b01, ptr, reg);
+        push_byte(func, displacement); // disp8
+    }
+    else {
+        push_modrm(func, 0b10, ptr, reg);
+        push_dword(func, displacement); // disp32
+    }
+}
+
+void x86_mov_memreg8(X86fn* func, X86reg ptr, int16_t displacement, X86reg reg) {
+    // rex prefix only needed if we use R8...15 registers
+    bool rex_b = ptr >> 3;
+    bool rex_r = ptr >> 3;
+    if (rex_b || rex_r) {
+        push_rex(func, 0, rex_r, 0, rex_b);
+    }
+
+    // instruction
+    push_byte(func, 0x88);
+    
+    // modrm + displacement
+    if (displacement < 256) { // compiler seems to consider the limit is 127
+        push_modrm(func, 0b01, ptr, reg);
+        push_byte(func, displacement); // disp8
+    }
+    else {
+        push_modrm(func, 0b10, ptr, reg);
+        push_dword(func, displacement); // disp32
+    }
+}
+
+void x86_add_regimm8(X86fn* func, X86reg reg, uint8_t imm) {
+    if (reg == EAX) {
+        push_byte(func, 0x04);
+        push_byte(func, imm);
+    }
+    else {
+        push_byte(func, 0x02);
+        push_modrm(func, 0b00, 0b101, reg);
+        push_byte(func, imm);
+    }
 }
 
 void x86_retn(X86fn* func) {

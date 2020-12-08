@@ -66,6 +66,11 @@ http://mattmik.com/files/chip8/mastering/chip8.html
 
 http://www.c-jump.com/CIS77/CPU/x86/lecture.html#X77_0010_real_encoding
 
+http://ref.x86asm.net/coder64.html#modrm_byte_32_64
+
+https://defuse.ca/online-x86-assembler.htm#disassembly
+
+https://wiki.osdev.org/X86-64_Instruction_Encoding#ModR.2FM_and_SIB_bytes
 
 ### x86 adressing
 

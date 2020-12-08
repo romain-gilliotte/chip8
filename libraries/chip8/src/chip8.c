@@ -104,7 +104,7 @@ int chip8_disassemble(Chip8 *state, FILE *f)
         else if (q4 == 0x0001)
             fprintf(f, "0x%04x: OR   V%x, V%x\n", state->PC, x, y);
         else if (q4 == 0x0002)
-            fprintf(f, "0x%04x: AND   V%x, V%x\n", state->PC, x, y);
+            fprintf(f, "0x%04x: AND  V%x, V%x\n", state->PC, x, y);
         else if (q4 == 0x0003)
             fprintf(f, "0x%04x: XOR  V%x, V%x\n", state->PC, x, y);
         else if (q4 == 0x0004)

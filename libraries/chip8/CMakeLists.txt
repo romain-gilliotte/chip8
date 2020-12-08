@@ -12,9 +12,12 @@ target_sources(
     PUBLIC
         src/chip8.h
         src/interpreter/interpreter.h
+        src/recompiler/recompiler.h
     PRIVATE
         src/chip8.c
         src/interpreter/interpreter.c
+        src/recompiler/recompiler.c
+        src/recompiler/x86.c
 )
 
 target_include_directories(

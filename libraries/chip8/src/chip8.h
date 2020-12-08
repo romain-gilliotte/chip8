@@ -54,11 +54,6 @@ typedef enum
     CHIP8_CALL_STACK_FULL,
 } Chip8Error;
 
-typedef enum  {
-    INTERPRETER,
-    RECOMPILER
-} Engine;
-
 /**
  * Initialize the Chip8 struct
  * 
