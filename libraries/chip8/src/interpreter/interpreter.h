@@ -1,5 +1,5 @@
 #pragma once
 #include "../chip8.h"
 
-int interpreter_run(Chip8 *state, uint32_t ticks);
-int interpreter_step(Chip8 *state);
+Chip8Error interpreter_run(Chip8 *state, uint32_t ticks);
+Chip8Error interpreter_step(Chip8 *state);

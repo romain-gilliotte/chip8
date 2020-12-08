@@ -540,11 +540,11 @@ static void exec_fx65(Chip8 *state)
     state->PC += 2;
 }
 
-int interpreter_run(Chip8 *state, uint32_t ticks)
+Chip8Error interpreter_run(Chip8 *state, uint32_t ticks)
 {
     uint64_t expected_cc = ticks * state->clock_speed / 1000;
 
-    int result = 0;
+    Chip8Error result = 0;
     while (!result && state->cycle_counts < expected_cc)
     {
         result = interpreter_step(state);
@@ -553,9 +553,9 @@ int interpreter_run(Chip8 *state, uint32_t ticks)
     return result;
 }
 
-int interpreter_step(Chip8 *state)
+Chip8Error interpreter_step(Chip8 *state)
 {
-    // chip8_disassemble(stdout, state->memory + state->PC, 2);
+    // chip8_disassemble(state, stdout);
 
     // Run current opcode.
     uint16_t opcode = ((uint16_t)state->memory[state->PC] << 8) | state->memory[state->PC + 1];
@@ -573,7 +573,7 @@ int interpreter_step(Chip8 *state)
             exec_00ee(state);
             break;
         default:
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         }
         break;
 
@@ -594,7 +594,7 @@ int interpreter_step(Chip8 *state)
         if ((opcode & 0x000F) == 0)
             exec_5xy0(state);
         else
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         break;
 
     case 0x6000:
@@ -634,7 +634,7 @@ int interpreter_step(Chip8 *state)
             exec_8xye(state);
             break;
         default:
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         }
         break;
     case 0x9000:
@@ -644,7 +644,7 @@ int interpreter_step(Chip8 *state)
             exec_9xy0(state);
             break;
         default:
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         }
         break;
     case 0xA000:
@@ -669,7 +669,7 @@ int interpreter_step(Chip8 *state)
             exec_exa1(state);
             break;
         default:
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         }
         break;
     case 0xF000:
@@ -703,10 +703,13 @@ int interpreter_step(Chip8 *state)
             exec_fx65(state);
             break;
         default:
-            return CHIP8_INVALID_OPCODE;
+            return CHIP8_OPCODE_INVALID;
         }
         break;
     }
+
+    // All instructions count as one cycle
+    state->cycle_counts++;
 
     // Decrement timer at 60Hz, regardless of emulation clock speed.
     int every = state->clock_speed / 60;
@@ -718,9 +721,6 @@ int interpreter_step(Chip8 *state)
         if (state->ST > 0)
             state->ST--;
     }
-
-    // All instructions count as one cycle
-    state->cycle_counts++;
 
     return 0;
 }

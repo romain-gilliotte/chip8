@@ -66,6 +66,32 @@ static void push_rex(X86fn* func, bool w, bool r, bool x, bool b) {
     push_byte(func, byte);
 }
 
+
+static void push_op(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr, int32_t displacement) {
+    // rex prefix only needed if we use R8...15 registers
+    bool rex_b = ptr >> 3;
+    bool rex_r = ptr >> 3;
+    if (rex_b || rex_r) {
+        push_rex(func, 0, rex_r, 0, rex_b);
+    }
+
+    // instruction
+    push_byte(func, opcode);
+    
+    // modrm + displacement
+    reg = (X86reg) (reg & 0x7);
+    ptr = (X86reg) (ptr & 0x7);
+    if (displacement < 256) { // compiler seems to consider the limit is 127
+        push_modrm(func, 0b01, ptr, reg);
+        push_byte(func, displacement); // disp8
+    }
+    else {
+        push_modrm(func, 0b10, ptr, reg);
+        push_dword(func, displacement); // disp32
+    }
+}
+
+
 /////////
 // Init & run
 /////////
@@ -107,85 +133,72 @@ int x86_run(X86fn* func) {
 // Instructions
 /////////
 
+// Immediate
+
 void x86_mov_regimm32(X86fn* func, X86reg reg, uint32_t imm) {
     bool rex_r = reg >> 3;
-    reg = reg & 0x1F;
-
     if (rex_r)
-        push_rex(func, 0, rex_r, 0, 0);    
+        push_rex(func, 0, rex_r, 0, 0);
 
+    reg = (X86reg) (reg & 0x7);
     push_byte(func, 0xB8 | reg);
     push_dword(func, imm);
 }
 
 void x86_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
     bool rex_r = reg >> 3;
-    reg = reg & 0x1F;
+    reg = (X86reg) (reg & 0x7);
 
     push_rex(func, 1, rex_r, 0, 0);
     push_byte(func, 0xB8 | reg); // mov r16/32/64, imm16/32/64
     push_qword(func, imm);
 }
 
-void x86_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int16_t displacement) {
-    // rex prefix only needed if we use R8...15 registers
-    bool rex_b = ptr >> 3;
-    bool rex_r = ptr >> 3;
-    reg = reg & 0x1F;
-    ptr = ptr & 0x1F;
+// Move
 
-    if (rex_b || rex_r) {
-        push_rex(func, 0, rex_r, 0, rex_b);
-    }
-
-    // instruction
-    push_byte(func, 0x8A);
-    
-    // modrm + displacement
-    if (displacement < 256) { // compiler seems to consider the limit is 127
-        push_modrm(func, 0b01, ptr, reg);
-        push_byte(func, displacement); // disp8
-    }
-    else {
-        push_modrm(func, 0b10, ptr, reg);
-        push_dword(func, displacement); // disp32
-    }
+void x86_movzx_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_byte(func, 0x0f); // this will break if used with r8 and more.
+    // the prefix should be between REX and primary opcode
+    push_op(func, 0xB6, reg, ptr, displacement);
 }
 
-void x86_mov_memreg8(X86fn* func, X86reg ptr, int16_t displacement, X86reg reg) {
-    // rex prefix only needed if we use R8...15 registers
-    bool rex_b = ptr >> 3;
-    bool rex_r = ptr >> 3;
-    if (rex_b || rex_r) {
-        push_rex(func, 0, rex_r, 0, rex_b);
-    }
-
-    // instruction
-    push_byte(func, 0x88);
-    
-    // modrm + displacement
-    if (displacement < 256) { // compiler seems to consider the limit is 127
-        push_modrm(func, 0b01, ptr, reg);
-        push_byte(func, displacement); // disp8
-    }
-    else {
-        push_modrm(func, 0b10, ptr, reg);
-        push_dword(func, displacement); // disp32
-    }
+void x86_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_op(func, 0x8A, reg, ptr, displacement);
 }
 
-void x86_add_regimm8(X86fn* func, X86reg reg, uint8_t imm) {
-    if (reg == EAX) {
-        push_byte(func, 0x04);
-        push_byte(func, imm);
-    }
-    else {
-        push_byte(func, 0x02);
-        push_modrm(func, 0b00, 0b101, reg);
-        push_byte(func, imm);
-    }
+void x86_mov_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_byte(func, 0x66); //  Operand-Size prefix
+    push_op(func, 0x8B, reg, ptr, displacement);
+}
+
+void x86_mov_regmem32(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_op(func, 0x8B, reg, ptr, displacement);
+}
+
+void x86_mov_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x88, reg, ptr, displacement);
+}
+
+void x86_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_byte(func, 0x66); //  Operand-Size prefix
+    push_op(func, 0x89, reg, ptr, displacement);
+}
+
+void x86_mov_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x89, reg, ptr, displacement);
 }
 
 void x86_retn(X86fn* func) {
     push_byte(func, 0xC3);
+}
+
+// add
+
+void x86_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x00, reg, ptr, displacement);
+}
+
+void x86_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_byte(func, 0x66); //  Operand-Size prefix
+    push_op(func, 0x01, reg, ptr, displacement);
 }

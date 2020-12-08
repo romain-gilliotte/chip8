@@ -48,7 +48,7 @@ int chip8_load_rom(Chip8 *state, const char *rom)
 
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
-    if (fsize + 0x200 > sizeof(state->memory))
+    if (fsize < 0 || sizeof(state->memory) < (unsigned) fsize + 0x200)
         return CHIP8_ROM_TOO_LONG;
 
     fseek(f, 0, SEEK_SET);
@@ -58,7 +58,7 @@ int chip8_load_rom(Chip8 *state, const char *rom)
     return 0;
 }
 
-int chip8_disassemble(Chip8 *state, FILE *f)
+void chip8_disassemble(Chip8 *state, FILE *f)
 {
     uint16_t opcode = state->memory[state->PC + 1] | (state->memory[state->PC] << 8); // big endian
     uint16_t q1 = opcode & 0xF000;
@@ -171,10 +171,16 @@ int chip8_disassemble(Chip8 *state, FILE *f)
 
 int chip8_dump(Chip8 *state, FILE *f)
 {
+    (void) state;
+    (void) f;
+
     return 0;
 }
 
 int chip8_restore(Chip8 *state, FILE *f)
 {
+    (void) state;
+    (void) f;
+
     return 0;
 }

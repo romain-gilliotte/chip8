@@ -7,6 +7,7 @@ typedef struct {
 
     uint16_t start;
     uint16_t end;
+    uint32_t cycles;
     bool draws;
 } CodeCache;
 
@@ -16,10 +17,5 @@ typedef struct {
 
 } CodeCacheRepository;
 
-
-typedef enum {
-    OPCODE_NOT_SUPPORTED = -2,
-} CacheReturnCode;
-
 int recompiler_init(CodeCacheRepository* repository);
-int recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks);
+Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks);

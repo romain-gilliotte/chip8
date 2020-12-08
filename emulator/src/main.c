@@ -41,10 +41,43 @@ static bool process_events(Chip8 *state)
     return false;
 }
 
+/** Naively scales pixel buffer, to make chip8 resolution more bearable */
+static void scale2x(bool* sm_pb, bool* lg_pb, int width, int height) {
+    for (int i = 0; i < width * height; ++i) {
+        bool b = sm_pb[i < width ? i : i - width];
+        bool d = sm_pb[i % width == 0 ? i : i - 1];
+        bool e = sm_pb[i];
+        bool f = sm_pb[i % width == width - 1 ? i : i + 1];
+        bool h = sm_pb[i + width < width * height ? i + width : i];
+
+        bool e0, e1, e2, e3;
+        if (b != h && d != f) {
+            e0 = d == b ? d : e;
+            e1 = b == f ? f : e;
+            e2 = d == h ? d : e;
+            e3 = h == f ? f : e;
+        } else {
+            e0 = e;
+            e1 = e;
+            e2 = e;
+            e3 = e;
+        }
+
+        int x = i % width;
+        int y = i / width;
+        lg_pb[y * 4 * width + 2 * x] = e0;
+        lg_pb[y * 4 * width + 2 * x + 1] = e1;
+        lg_pb[y * 4 * width + 2 * width + 2 * x] = e2;
+        lg_pb[y * 4 * width + 2 * width + 2 * x + 1] = e3;
+    }
+}
+
 /** Redraw full screen at each frame */
-static void render(SDL_Window *window, Chip8 *state)
+static void render(SDL_Window *window, bool* pixel_buffer, int pb_width, int pb_height)
 {
     SDL_Surface *surface = SDL_GetWindowSurface(window);
+    uint32_t fgcolor = SDL_MapRGB(surface->format, 0xfe, 0xe7, 0x15);
+    uint32_t bgcolor = SDL_MapRGB(surface->format, 0x10, 0x18, 0x20);
 
     uint32_t width = surface->w;
     uint32_t height = surface->h;
@@ -54,10 +87,10 @@ static void render(SDL_Window *window, Chip8 *state)
     {
         uint32_t x_window = i % width;
         uint32_t y_window = i / width;
-        uint32_t x_chip8 = x_window * state->screen_width / width;
-        uint32_t y_chip8 = y_window * state->screen_height / height;
+        uint32_t x_chip8 = x_window * pb_width / width;
+        uint32_t y_chip8 = y_window * pb_height / height;
 
-        pixels[i] = state->display[y_chip8 * state->screen_width + x_chip8] ? 0xffffffff : 0;
+        pixels[i] = pixel_buffer[y_chip8 * pb_width + x_chip8] ? fgcolor : bgcolor;
     }
 
     SDL_UpdateWindowSurface(window);
@@ -66,34 +99,38 @@ static void render(SDL_Window *window, Chip8 *state)
 
 int main(const int argc, const char **argv)
 {
-    // Init Chip8 & SDL
+    // Init Chip8 & Recompiler
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
     chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
-
-    SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
+    
 
     CodeCacheRepository repository;
     recompiler_init(&repository);
 
-    // Loop
-    bool finished = false;
-    uint32_t started_at = SDL_GetTicks();
-    while (!finished)
-    {
-        // Process events.
-        finished = process_events(&state);
+    // Init SDL
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
 
-        // Run Chip8
+    // Main loop
+    uint32_t started_at = SDL_GetTicks();
+    while (true)
+    {
+        if (process_events(&state))
+            break;
+
         uint32_t ticks = SDL_GetTicks() - started_at;
         // if (interpreter_run(&state, ticks))
         if (recompiler_run(&repository, &state, ticks))
             return 1;
 
-        // Render
         if (state.display_dirty) {
-            render(window, &state);
+            bool pb_medium[4096 * 4];
+            bool pb_large[4096 * 4 * 4];
+            scale2x(state.display, pb_medium, state.screen_width, state.screen_height);
+            scale2x(pb_medium, pb_large, 2 * state.screen_width, 2 * state.screen_height);
+
+            render(window, pb_large, 4 * state.screen_width, 4 * state.screen_height);
             state.display_dirty = false;
         }
 

@@ -21,13 +21,13 @@ typedef struct
     bool display_dirty;
 
     ////////////
-    // Machine state
+    // Machine
     ////////////
 
     uint8_t memory[4096];
 
     // IO
-    uint8_t *display; // one byte per pixel
+    bool *display; // one byte per pixel
     uint8_t keyboard[16];
 
     // Registers
@@ -42,16 +42,18 @@ typedef struct
     // Stack
     uint8_t SP;
     uint16_t stack[16];
+
 } Chip8;
 
 typedef enum
 {
-    CHIP8_OK,
-    CHIP8_ROM_NOT_FOUND,
-    CHIP8_ROM_TOO_LONG,
-    CHIP8_INVALID_OPCODE,
-    CHIP8_CALL_STACK_EMPTY,
-    CHIP8_CALL_STACK_FULL,
+    CHIP8_OK = 0,
+    CHIP8_ROM_NOT_FOUND = -1,
+    CHIP8_ROM_TOO_LONG = -2,
+    CHIP8_OPCODE_INVALID = -3,
+    CHIP8_OPCODE_NOT_SUPPORTED = -4,
+    CHIP8_CALL_STACK_EMPTY = -5,
+    CHIP8_CALL_STACK_FULL = -6,
 } Chip8Error;
 
 /**
@@ -65,6 +67,6 @@ typedef enum
  */
 int chip8_init(Chip8 *state, int width, int height, int clock_speed);
 int chip8_load_rom(Chip8 *state, const char *rom);
-int chip8_disassemble(Chip8 *state, FILE *f);
+void chip8_disassemble(Chip8 *state, FILE *f);
 int chip8_dump(Chip8 *state, FILE *f);
 int chip8_restore(Chip8 *state, FILE *f);
