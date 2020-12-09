@@ -544,7 +544,7 @@ Chip8Error interpreter_run(Chip8 *state, uint32_t ticks)
 {
     uint64_t expected_cc = ticks * state->clock_speed / 1000;
 
-    Chip8Error result = 0;
+    Chip8Error result = CHIP8_OK;
     while (!result && state->cycle_counts < expected_cc)
     {
         result = interpreter_step(state);
@@ -555,7 +555,7 @@ Chip8Error interpreter_run(Chip8 *state, uint32_t ticks)
 
 Chip8Error interpreter_step(Chip8 *state)
 {
-    // chip8_disassemble(state, stdout);
+    chip8_disassemble(state, stdout);
 
     // Run current opcode.
     uint16_t opcode = ((uint16_t)state->memory[state->PC] << 8) | state->memory[state->PC + 1];
@@ -722,5 +722,5 @@ Chip8Error interpreter_step(Chip8 *state)
             state->ST--;
     }
 
-    return 0;
+    return CHIP8_OK;
 }

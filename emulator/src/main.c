@@ -104,7 +104,6 @@ int main(const int argc, const char **argv)
     chip8_init(&state, 64, 32, 500);
     chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
     
-
     CodeCacheRepository repository;
     recompiler_init(&repository);
 
