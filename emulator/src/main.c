@@ -74,7 +74,6 @@ static void scale2x(bool* sm_pb, bool* lg_pb, int width, int height) {
     }
 }
 
-/** Redraw full screen at each frame */
 static void render(SDL_Window *window, bool* pixel_buffer, int pb_width, int pb_height)
 {
     SDL_Surface *surface = SDL_GetWindowSurface(window);
