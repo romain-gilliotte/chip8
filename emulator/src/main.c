@@ -8,6 +8,7 @@
 static bool process_events(Chip8 *state)
 {
     SDL_Event e;
+    bool key_is_down;
 
     while (SDL_PollEvent(&e) > 0) {
         switch (e.type) {
@@ -16,23 +17,24 @@ static bool process_events(Chip8 *state)
 
             case SDL_KEYDOWN:
             case SDL_KEYUP:
+                key_is_down = e.type == SDL_KEYDOWN;
                 switch (e.key.keysym.sym) {
-                    case SDLK_1: state->keyboard[0x1] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_2: state->keyboard[0x2] = e.type == SDL_KEYDOWN; break; 
-                    case SDLK_3: state->keyboard[0x3] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_4: state->keyboard[0xC] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_q: state->keyboard[0x4] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_w: state->keyboard[0x5] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_e: state->keyboard[0x6] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_r: state->keyboard[0xD] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_a: state->keyboard[0x7] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_s: state->keyboard[0x8] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_d: state->keyboard[0x9] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_f: state->keyboard[0xE] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_z: state->keyboard[0xA] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_x: state->keyboard[0x0] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_c: state->keyboard[0xB] = e.type == SDL_KEYDOWN; break;
-                    case SDLK_v: state->keyboard[0xF] = e.type == SDL_KEYDOWN; break;
+                    case SDLK_1: state->keyboard[0x1] = key_is_down; break;
+                    case SDLK_2: state->keyboard[0x2] = key_is_down; break; 
+                    case SDLK_3: state->keyboard[0x3] = key_is_down; break;
+                    case SDLK_4: state->keyboard[0xC] = key_is_down; break;
+                    case SDLK_q: state->keyboard[0x4] = key_is_down; break;
+                    case SDLK_w: state->keyboard[0x5] = key_is_down; break;
+                    case SDLK_e: state->keyboard[0x6] = key_is_down; break;
+                    case SDLK_r: state->keyboard[0xD] = key_is_down; break;
+                    case SDLK_a: state->keyboard[0x7] = key_is_down; break;
+                    case SDLK_s: state->keyboard[0x8] = key_is_down; break;
+                    case SDLK_d: state->keyboard[0x9] = key_is_down; break;
+                    case SDLK_f: state->keyboard[0xE] = key_is_down; break;
+                    case SDLK_z: state->keyboard[0xA] = key_is_down; break;
+                    case SDLK_x: state->keyboard[0x0] = key_is_down; break;
+                    case SDLK_c: state->keyboard[0xB] = key_is_down; break;
+                    case SDLK_v: state->keyboard[0xF] = key_is_down; break;
                 }
                 break;
         }
@@ -97,12 +99,15 @@ static void render(SDL_Window *window, bool* pixel_buffer, int pb_width, int pb_
 }
 
 
-int main(const int argc, const char **argv)
+int main(int argc, const char **argv)
 {
+    (void) argc;
+    (void) argv;
+    
     // Init Chip8 & Recompiler
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
     
     CodeCacheRepository repository;
     recompiler_init(&repository);
@@ -124,12 +129,9 @@ int main(const int argc, const char **argv)
             return 1;
 
         if (state.display_dirty) {
-            bool pb_medium[4096 * 4];
-            bool pb_large[4096 * 4 * 4];
-            scale2x(state.display, pb_medium, state.screen_width, state.screen_height);
-            scale2x(pb_medium, pb_large, 2 * state.screen_width, 2 * state.screen_height);
-
-            render(window, pb_large, 4 * state.screen_width, 4 * state.screen_height);
+            bool pb_large[4096 * 4];
+            scale2x(state.display, pb_large, state.screen_width, state.screen_height);
+            render(window, pb_large, 2 * state.screen_width, 2 * state.screen_height);
             state.display_dirty = false;
         }
 

@@ -45,8 +45,7 @@ static void push_qword(X86fn* func, uint64_t qword) {
  */
 static void push_modrm(X86fn* func, uint8_t mod, uint8_t rm, X86reg reg)
 {
-    uint8_t byte = (mod << 6) | (reg << 4) | rm;
-
+    uint8_t byte = (mod << 6) | (reg << 3) | rm;
 	push_byte(func, byte);
 }
 
@@ -117,6 +116,7 @@ int x86_lock(X86fn* func) {
     }
 
     func->executable = true;
+    return 0;
 }
 
 int x86_run(X86fn* func) {
@@ -202,3 +202,47 @@ void x86_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg)
     push_byte(func, 0x66); //  Operand-Size prefix
     push_op(func, 0x01, reg, ptr, displacement);
 }
+
+void x86_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x01, reg, ptr, displacement);
+}
+
+// inc/dec
+
+void x86_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_op(func, 0xff, 0, ptr, displacement);    
+}
+
+void x86_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_op(func, 0xff, 1, ptr, displacement);    
+}
+
+// others, 8 bits
+
+void x86_cmp_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_op(func, 0x3A, reg, ptr, displacement);
+}
+
+void x86_or_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x08, reg, ptr, displacement);
+}
+
+void x86_and_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x20, reg, ptr, displacement);
+}
+
+void x86_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_op(func, 0x30, reg, ptr, displacement);
+}
+
+// jumps
+void x86_jz8(X86fn* func, int8_t distance) {
+    push_byte(func, 0x74);
+    push_byte(func, (uint8_t) distance);
+}
+
+void x86_jnz8(X86fn* func, int8_t distance) {
+    push_byte(func, 0x75);
+    push_byte(func, (uint8_t) distance);
+}
+

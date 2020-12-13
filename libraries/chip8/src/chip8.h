@@ -17,7 +17,7 @@ typedef struct
     // Emulation state
     ////////////
 
-    uint32_t cycle_counts;
+    uint32_t cycles_since_started;
     bool display_dirty;
 
     ////////////

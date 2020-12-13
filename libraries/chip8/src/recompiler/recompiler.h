@@ -4,11 +4,8 @@
 
 typedef struct {
     X86fn code;
-
     uint16_t start;
     uint16_t end;
-    uint32_t cycles;
-    bool draws;
 } CodeCache;
 
 typedef struct {
@@ -17,5 +14,5 @@ typedef struct {
 
 } CodeCacheRepository;
 
-int recompiler_init(CodeCacheRepository* repository);
+void recompiler_init(CodeCacheRepository* repository);
 Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks);

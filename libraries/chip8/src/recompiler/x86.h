@@ -51,3 +51,30 @@ void x86_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg)
 
 void x86_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
 void x86_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+void x86_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+
+//////////
+// Inc/Dec
+//////////
+
+void x86_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement);
+void x86_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement);
+
+//////////
+// 8 bits ops
+//////////
+
+void x86_cmp_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
+
+void x86_or_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+void x86_and_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+void x86_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+
+
+//////////
+// jumps
+//////////
+
+void x86_jz8(X86fn* func, int8_t distance);
+void x86_jnz8(X86fn* func, int8_t distance);
+

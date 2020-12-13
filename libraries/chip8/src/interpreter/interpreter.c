@@ -234,7 +234,6 @@ static void exec_8xy5(Chip8 *state)
 static void exec_8xy6(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
 
     state->registers[15] = state->registers[x] & 0x1;
     state->registers[x] >>= 1;
@@ -266,7 +265,6 @@ static void exec_8xy7(Chip8 *state)
 static void exec_8xye(Chip8 *state)
 {
     uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
 
     state->registers[15] = state->registers[x] >> 7;
     state->registers[x] <<= 1;
@@ -545,7 +543,7 @@ Chip8Error interpreter_run(Chip8 *state, uint32_t ticks)
     uint64_t expected_cc = ticks * state->clock_speed / 1000;
 
     Chip8Error result = CHIP8_OK;
-    while (!result && state->cycle_counts < expected_cc)
+    while (!result && state->cycles_since_started < expected_cc)
     {
         result = interpreter_step(state);
     }
@@ -573,7 +571,7 @@ Chip8Error interpreter_step(Chip8 *state)
             exec_00ee(state);
             break;
         default:
-            return CHIP8_OPCODE_INVALID;
+            return CHIP8_OPCODE_NOT_SUPPORTED;
         }
         break;
 
@@ -709,11 +707,11 @@ Chip8Error interpreter_step(Chip8 *state)
     }
 
     // All instructions count as one cycle
-    state->cycle_counts++;
+    state->cycles_since_started++;
 
     // Decrement timer at 60Hz, regardless of emulation clock speed.
     int every = state->clock_speed / 60;
-    if (state->cycle_counts % every == 0)
+    if (state->cycles_since_started % every == 0)
     {
         if (state->DT > 0)
             state->DT--;

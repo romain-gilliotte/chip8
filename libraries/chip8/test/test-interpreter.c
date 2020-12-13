@@ -398,7 +398,7 @@ int main(void)
         // cmocka_unit_test_setup_teardown(test_8xy7, setup, teardown),
         // cmocka_unit_test_setup_teardown(test_8xye, setup, teardown),
         // cmocka_unit_test_setup_teardown(test_9xy0, setup, teardown),
-        // cmocka_unit_test_setup_teardown(test_annn, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_annn, setup, teardown),
         // cmocka_unit_test_setup_teardown(test_bnnn, setup, teardown),
         cmocka_unit_test_setup_teardown(test_cxkk, setup, teardown),
         cmocka_unit_test_setup_teardown(test_dxyn_simple, setup, teardown),
