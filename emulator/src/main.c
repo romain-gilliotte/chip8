@@ -106,7 +106,7 @@ int main(int argc, const char **argv)
     // Init Chip8 & Recompiler
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
     
     CodeCacheRepository repository;
     recompiler_init(&repository);
@@ -116,15 +116,13 @@ int main(int argc, const char **argv)
     SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
 
     // Main loop
-    uint32_t started_at = SDL_GetTicks();
     while (true)
     {
         if (process_events(&state))
             break;
 
-        uint32_t ticks = SDL_GetTicks() - started_at;
         // if (interpreter_run(&state, ticks))
-        if (recompiler_run(&repository, &state, ticks))
+        if (recompiler_run(&repository, &state, SDL_GetTicks()))
             return 1;
 
         if (state.display_dirty) {

@@ -21,16 +21,20 @@ Some milestones for this project.
 
 - [x] Basic build system with CMake
 - [x] Unit testing
-- [x] Interpreter: CPU
-- [x] Interpreter: graphics
-- [x] Interpreter: input
+- [x] Interpreter
+- [x] Graphics
+- [x] Inputs
 - [ ] Quality: Linter?
-- [x] Recompiler supporting some instructions written by hand
+- [x] Recompiler by hand (some instructions)
+- [x] Scale2x
+- [ ] Menus (to do what... load roms? set quirks? enable debugger?)
 - [ ] Write NodeJS native library
 - [ ] Write CPython native library
-- [ ] Cross-compilation: Make this work in both windows / linux
+- [ ] Hardware rendering
+- [ ] Shader to look like old TV
+- [ ] Cross-compilation: Make this work at least in windows / linux
 - [ ] Delivery: Distro packages, flatpak, windows installers...
-- [ ] Dependency management: Nuget? Conan? How to use/bundle recent versions of dependencies? npm's package.json equivalent?
+- [ ] Dependency management: Vcpkg? Nuget? Conan? How to use/bundle recent versions of dependencies? npm's package.json equivalent?
 - [ ] CI/CD: What are the industry standart CI/CD systems for C/C++?
 - [ ] Recompiler using asmjit?
 - [ ] Recompiler using LLVM?
