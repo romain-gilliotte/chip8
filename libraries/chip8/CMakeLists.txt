@@ -17,7 +17,7 @@ target_sources(
         src/chip8.c
         src/interpreter/interpreter.c
         src/recompiler/recompiler.c
-        src/recompiler/x86.c
+        src/recompiler/x64.c
 )
 
 target_include_directories(

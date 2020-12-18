@@ -5,8 +5,8 @@
 #include "../chip8.h"
 #include "../interpreter/interpreter.h"
 
-static void cache_create(Chip8* state, CodeCache* cache);
-static bool encode_instruction(CodeCache* cache, Chip8* state);
+static void translate_block(CodeCache* cache, Chip8* state);
+static bool translate_instruction(CodeCache* cache, Chip8* state);
 static bool encode_error(CodeCache* cache, Chip8* state, Chip8Error code);
 static int  next_length(CodeCache* cache, Chip8* state);
 static bool is_skip(uint16_t opcode);
@@ -21,12 +21,11 @@ Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_
 
     while (state->cycles_since_started < expected_cc)
     {
-        CodeCache* cache = repository->caches[state->PC];
-
         // Compile code of the required section if needed.
+        CodeCache* cache = repository->caches[state->PC];
         if (!cache) {
             cache = (CodeCache*) malloc(sizeof(CodeCache));
-            cache_create(state, cache);
+            translate_block(cache, state);
             repository->caches[state->PC] = cache;
         }
 
@@ -34,7 +33,7 @@ Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_
         int32_t cycles_before = state->cycles_since_started;
 
         // Run section & handle errors
-        Chip8Error error = (Chip8Error) x86_run(&cache->code);
+        Chip8Error error = (Chip8Error) x64_run(&cache->code);
         if (error < 0) {
             if (error == CHIP8_OPCODE_NOT_SUPPORTED) {
                 // Replay last instruction in interpreter
@@ -47,7 +46,7 @@ Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_
         }
 
         // Decrement timer at 60Hz, regardless of emulation clock speed.
-        int missed_timers = 
+        int missed_timers =
             + state->cycles_since_started * 60 / state->clock_speed // expected timers
             - cycles_before * 60 / state->clock_speed; // already done timers
 
@@ -58,18 +57,18 @@ Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_
     return CHIP8_OK;
 }
 
-static void cache_create(Chip8* state, CodeCache* cache) {
+static void translate_block(CodeCache* cache, Chip8* state) {
     cache->start = state->PC;
     cache->end = state->PC;
 
-    x86_init(&cache->code, 4096);
-    x86_mov_regimm64(&cache->code, ECX, (uint64_t) state); // Load pointer to chip8 state
+    x64_init(&cache->code, 4096);
+    x64_mov_regimm64(&cache->code, ECX, (uint64_t) state); // Load pointer to chip8 state
 
-    while (encode_instruction(cache, state)) {
+    while (translate_instruction(cache, state)) {
         cache->end += 2;
     }
 
-    x86_lock(&cache->code);
+    x64_lock(&cache->code);
 
     // debug print
     for (uint32_t i = 0; i < cache->code.buffer_ptr; ++i)
@@ -77,8 +76,15 @@ static void cache_create(Chip8* state, CodeCache* cache) {
     printf("   %d\n", (cache->end - cache->start) / 2);
 }
 
-
-static bool encode_instruction(CodeCache* cache, Chip8* state) {
+/**
+ * Reads the instruction which is at cache->end in the Chip8 memory and translate it in x64 code.
+ * This function assumes that a pointer to the Chip8 state was previously loaded in the ECX register.
+ * Note: cache->end is NOT incremented
+ * 
+ * @returns true when when we can continue, and encode the next instruction.
+ * @returns false when a jump has occured: this block is finished.
+ */
+static bool translate_instruction(CodeCache* cache, Chip8* state) {
     // Compute offsets to access memory. They need to fit in 32bits or less.
     uint32_t ecx_registers = (uint64_t) &state->registers - (uint64_t) state;
     uint32_t ecx_memory = (uint64_t) &state->memory - (uint64_t) state;
@@ -103,10 +109,6 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
     if (cache->end >= 2 && cache->start < cache->end)
         must_continue = is_skip((state->memory[cache->end - 2] << 8) | state->memory[cache->end - 1]);
 
-    // if ((opcode & 0x8000) != 0x8000) {
-    //                 return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
-    // }
-
     switch (n1) {
         case 0x0:
             switch (opcode) {
@@ -122,43 +124,43 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
 
         case 0x1: // JP addr
             // Update PC and cycles
-            x86_mov_regimm32(&cache->code, EAX, nnn);
-            x86_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
-            x86_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
-            x86_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+            x64_mov_regimm32(&cache->code, EAX, nnn);
+            x64_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+            x64_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
+            x64_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
 
             // return CHIP8_OK
-            x86_mov_regimm32(&cache->code, EAX, CHIP8_OK);
-            x86_retn(&cache->code);
+            x64_mov_regimm32(&cache->code, EAX, CHIP8_OK);
+            x64_retn(&cache->code);
             return must_continue;
 
         case 0x2: // CALL addr
             return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
 
         case 0x3: // SE Vx, byte
-            x86_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
-            x86_mov_regimm32(&cache->code, EAX, kk); // load kk in register
-            x86_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
-            x86_jz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
-            x86_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
+            x64_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
+            x64_mov_regimm32(&cache->code, EAX, kk); // load kk in register
+            x64_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
+            x64_jz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
+            x64_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
             return true;
 
         case 0x4: // SNE Vx, byte
-            x86_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
-            x86_mov_regimm32(&cache->code, EAX, kk); // load kk in register
-            x86_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
-            x86_jnz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
-            x86_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
+            x64_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
+            x64_mov_regimm32(&cache->code, EAX, kk); // load kk in register
+            x64_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
+            x64_jnz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
+            x64_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
             return true;
 
         case 0x5:
             switch (n4) {
                 case 0x0: // SE Vx, Vy
-                    x86_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y); // mov al, [state->registers + y]
-                    x86_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
-                    x86_jz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
-                    x86_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
+                    x64_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y); // mov al, [state->registers + y]
+                    x64_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
+                    x64_jz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
+                    x64_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
                     return true;
 
                 default:
@@ -166,64 +168,64 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
             }
 
         case 0x6: // LD Vx, kk
-            x86_mov_regimm32(&cache->code, EAX, kk); // mov eax, kk
-            x86_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX); // mov [state->registers + x], al
+            x64_mov_regimm32(&cache->code, EAX, kk); // mov eax, kk
+            x64_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX); // mov [state->registers + x], al
             return true;
-        
+
         case 0x7: // ADD Vx, kk
-            x86_mov_regimm32(&cache->code, EAX, kk); // mov eax, kk
-            x86_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX); // add [state->registers + x], al
+            x64_mov_regimm32(&cache->code, EAX, kk); // mov eax, kk
+            x64_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX); // add [state->registers + x], al
             return true;
 
         case 0x8:
             switch (n4) {
                 case 0x0: // LD Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0x1: // OR Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_or_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_or_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0x2: // AND Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_and_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_and_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0x3: // XOR Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_xor_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_xor_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0x4: // ADD Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_setc(&cache->code, ECX, ecx_registers + 15);
                     return true;
 
                 case 0x5: // SUB Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_sub_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    x86_setnc(&cache->code, ECX, ecx_registers + 15); // x > y
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_sub_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_setnc(&cache->code, ECX, ecx_registers + 15); // x > y
                     return true;
 
                 case 0x6: // SHR Vx, Vy
-                    x86_shr_memreg8(&cache->code, ECX, ecx_registers + x);
-                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    x64_shr_memreg8(&cache->code, ECX, ecx_registers + x);
+                    x64_setc(&cache->code, ECX, ecx_registers + 15);
                     return true;
 
                 case 0x7: // SUBN Vx, Vy
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    x86_sub_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
-                    x86_setnc(&cache->code, ECX, ecx_registers + 15);
-                    x86_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x64_sub_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
+                    x64_setnc(&cache->code, ECX, ecx_registers + 15);
+                    x64_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0xE: // SHL Vx, Vy
-                    x86_shl_memreg8(&cache->code, ECX, ecx_registers + x);
-                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    x64_shl_memreg8(&cache->code, ECX, ecx_registers + x);
+                    x64_setc(&cache->code, ECX, ecx_registers + 15);
                     return true;
 
                 default:
@@ -234,11 +236,11 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
             switch (n4)
             {
                 case 0x0: // SNE Vx, Vy
-                    x86_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y); // mov al, [state->registers + y]
-                    x86_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
-                    x86_jnz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
-                    x86_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
+                    x64_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y); // mov al, [state->registers + y]
+                    x64_cmp_regmem8(&cache->code, EAX, ECX, ecx_registers + x); // cmp Vx, kk
+                    x64_jnz8(&cache->code, 3 + next_length(cache, state)); // jz after next instruction (inc is 3bytes)
+                    x64_inc_mem32(&cache->code, ECX, ecx_cycles); // cycles++
                     return true;
 
                 default:
@@ -246,24 +248,24 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
             }
 
         case 0xA: // LD I, addr
-            x86_mov_regimm32(&cache->code, EAX, nnn);
-            x86_mov_memreg16(&cache->code, ECX, ecx_i, EAX);
+            x64_mov_regimm32(&cache->code, EAX, nnn);
+            x64_mov_memreg16(&cache->code, ECX, ecx_i, EAX);
             return true;
 
         case 0xB: // JP V0, addr
             // Update PC and cycles
-            x86_mov_regimm32(&cache->code, EAX, nnn);
-            x86_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
-            x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers); // not super efficient
-            x86_add_memreg16(&cache->code, ECX, ecx_pc, EAX);
+            x64_mov_regimm32(&cache->code, EAX, nnn);
+            x64_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+            x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers); // not super efficient
+            x64_add_memreg16(&cache->code, ECX, ecx_pc, EAX);
 
             // Update cycles
-            x86_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
-            x86_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+            x64_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
+            x64_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
 
             // return CHIP8_OK
-            x86_mov_regimm32(&cache->code, EAX, CHIP8_OK);
-            x86_retn(&cache->code);
+            x64_mov_regimm32(&cache->code, EAX, CHIP8_OK);
+            x64_retn(&cache->code);
             return must_continue;
 
         case 0xC: // RND Vx, byte
@@ -287,26 +289,26 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
         case 0xF:
             switch (kk) {
                 case 0x07: // LD Vx, DT
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_dt);
-                    x86_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_dt);
+                    x64_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
                     return true;
 
                 case 0x0a: // LD Vx, K
                     return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
 
                 case 0x15: // LD DT, Vx
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
-                    x86_mov_memreg8(&cache->code, ECX, ecx_dt, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
+                    x64_mov_memreg8(&cache->code, ECX, ecx_dt, EAX);
                     return true;
-                
+
                 case 0x18: // LD ST, Vx
-                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
-                    x86_mov_memreg8(&cache->code, ECX, ecx_st, EAX);
+                    x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
+                    x64_mov_memreg8(&cache->code, ECX, ecx_st, EAX);
                     return true;
 
                 case 0x1e: // ADD I, Vx
-                    x86_movzx_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
-                    x86_add_memreg16(&cache->code, ECX, ecx_i, EAX);
+                    x64_movzx_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
+                    x64_add_memreg16(&cache->code, ECX, ecx_i, EAX);
                     return true;
 
                 case 0x29: // LD F, Vx
@@ -331,7 +333,8 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
 }
 
 /**
- * Encode asm sequence for errors (invalid/unsupported opcode).
+ * Encode x64 for errors (invalid/unsupported opcode).
+ * 
  * This simply make the generated function update the state (PC & elapsed cycles)
  * and return the error to the caller.
  */
@@ -339,31 +342,34 @@ static bool encode_error(CodeCache* cache, Chip8* state, Chip8Error code) {
     if (cache->start < cache->end) {
         // Update program counter.
         uint32_t ecx_pc = (uint64_t) &state->PC - (uint64_t) state;
-        x86_mov_regimm32(&cache->code, EAX, cache->end);
-        x86_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+        x64_mov_regimm32(&cache->code, EAX, cache->end);
+        x64_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
 
         // Update elapsed cycles
         uint32_t ecx_cycles = (uint64_t) &state->cycles_since_started - (uint64_t) state;
-        x86_mov_regimm32(&cache->code, EAX, (cache->end - cache->start) / 2);
-        x86_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+        x64_mov_regimm32(&cache->code, EAX, (cache->end - cache->start) / 2);
+        x64_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
     }
 
     // return error code.
-    x86_mov_regimm32(&cache->code, EAX, code);
-    x86_retn(&cache->code);
+    x64_mov_regimm32(&cache->code, EAX, code);
+    x64_retn(&cache->code);
 
     return false;
 }
 
-/** Compute length of next instruction */
+/** 
+ * Compute length of next instruction in x64.
+ * This is needed to compute relative jumps when translating skip instructions
+ */
 static int next_length(CodeCache* cache, Chip8* state) {
     cache->end += 2;
-    
+
     int buffer_ptr = cache->code.buffer_ptr; // Save pointer
-    encode_instruction(cache, state); // Write instruction
+    translate_instruction(cache, state); // Write instruction
 
     int length = cache->code.buffer_ptr - buffer_ptr; // compute length
-    
+
     // Restore cache.
     cache->code.buffer_ptr = buffer_ptr;
     cache->end -= 2;

@@ -1,6 +1,6 @@
 #include <sys/mman.h>
 #include <stdio.h>
-#include "x86.h"
+#include "x64.h"
 
 /////////
 // Helpers
@@ -106,7 +106,7 @@ static void push_opregreg(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr) {
 // Init & run
 /////////
 
-int x86_init(X86fn* func, uint32_t size) {
+int x64_init(X86fn* func, uint32_t size) {
     func->buffer = (uint8_t*) mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     func->buffer_ptr = 0;
     func->buffer_size = size;
@@ -120,7 +120,7 @@ int x86_init(X86fn* func, uint32_t size) {
     return 0;
 }
 
-int x86_lock(X86fn* func) {
+int x64_lock(X86fn* func) {
     if (mprotect(func->buffer, func->buffer_size, PROT_READ | PROT_EXEC) == -1) {
         perror("mprotect");
         return -1;
@@ -130,7 +130,7 @@ int x86_lock(X86fn* func) {
     return 0;
 }
 
-int x86_run(X86fn* func) {
+int x64_run(X86fn* func) {
     if (!func->executable) {
         return -1;
     }
@@ -146,7 +146,7 @@ int x86_run(X86fn* func) {
 
 // Immediate
 
-void x86_mov_regimm32(X86fn* func, X86reg reg, uint32_t imm) {
+void x64_mov_regimm32(X86fn* func, X86reg reg, uint32_t imm) {
     bool rex_r = reg >> 3;
     if (rex_r)
         push_rex(func, 0, rex_r, 0, 0);
@@ -156,7 +156,7 @@ void x86_mov_regimm32(X86fn* func, X86reg reg, uint32_t imm) {
     push_dword(func, imm);
 }
 
-void x86_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
+void x64_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
     bool rex_r = reg >> 3;
     reg = (X86reg) (reg & 0x7);
 
@@ -167,98 +167,98 @@ void x86_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
 
 // Move
 
-void x86_movzx_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_movzx_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x0f); // this will break if used with r8 and more.
     // the prefix should be between REX and primary opcode
     push_opmemreg(func, 0xB6, reg, ptr, displacement);
 }
 
-void x86_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0x8A, reg, ptr, displacement);
 }
 
-void x86_mov_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_mov_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x66); //  Operand-Size prefix
     push_opmemreg(func, 0x8B, reg, ptr, displacement);
 }
 
-void x86_mov_regmem32(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_mov_regmem32(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0x8B, reg, ptr, displacement);
 }
 
-void x86_mov_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_mov_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x88, reg, ptr, displacement);
 }
 
-void x86_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_byte(func, 0x66); //  Operand-Size prefix
     push_opmemreg(func, 0x89, reg, ptr, displacement);
 }
 
-void x86_mov_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_mov_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x89, reg, ptr, displacement);
 }
 
-void x86_retn(X86fn* func) {
+void x64_retn(X86fn* func) {
     push_byte(func, 0xC3);
 }
 
 // add
 
-void x86_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x00, reg, ptr, displacement);
 }
 
-void x86_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_byte(func, 0x66); //  Operand-Size prefix
     push_opmemreg(func, 0x01, reg, ptr, displacement);
 }
 
-void x86_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x01, reg, ptr, displacement);
 }
 
 // inc/dec
 
-void x86_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0xff, 0, ptr, displacement);    
 }
 
-void x86_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0xff, 1, ptr, displacement);    
 }
 
 // others, 8 bits
 
-void x86_cmp_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_cmp_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0x3A, reg, ptr, displacement);
 }
 
-void x86_or_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_or_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x08, reg, ptr, displacement);
 }
 
-void x86_and_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_and_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x20, reg, ptr, displacement);
 }
 
-void x86_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x30, reg, ptr, displacement);
 }
 
 // jumps
-void x86_jz8(X86fn* func, int8_t distance) {
+void x64_jz8(X86fn* func, int8_t distance) {
     push_byte(func, 0x74);
     push_byte(func, (uint8_t) distance);
 }
 
-void x86_jnz8(X86fn* func, int8_t distance) {
+void x64_jnz8(X86fn* func, int8_t distance) {
     push_byte(func, 0x75);
     push_byte(func, (uint8_t) distance);
 }
 
 
-void x86_setc(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_setc(X86fn* func, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x0F);
     push_byte(func, 0x92);
     
@@ -272,7 +272,7 @@ void x86_setc(X86fn* func, X86reg ptr, int32_t displacement) {
     }
 }
 
-void x86_setnc(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_setnc(X86fn* func, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x0F);
     push_byte(func, 0x93);
     
@@ -286,22 +286,22 @@ void x86_setnc(X86fn* func, X86reg ptr, int32_t displacement) {
     }
 }
 
-void x86_sub_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+void x64_sub_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_opmemreg(func, 0x28, reg, ptr, displacement);
 }
 
-void x86_shr_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_shr_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0xd0, 5, ptr, displacement);
 }
 
-void x86_shl_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
+void x64_shl_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0xd0, 4, ptr, displacement);
 }
 
-void x86_sub_regreg8(X86fn* func, X86reg ptr, X86reg reg) {
+void x64_sub_regreg8(X86fn* func, X86reg ptr, X86reg reg) {
     push_opregreg(func, 0x28, reg, ptr);
 }
 
-void x86_sub_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+void x64_sub_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_opmemreg(func, 0x2A, reg, ptr, displacement);
 }

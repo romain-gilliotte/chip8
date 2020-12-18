@@ -1,5 +1,5 @@
 #pragma once
-#include "x86.h"
+#include "x64.h"
 #include "../chip8.h"
 
 typedef struct {
