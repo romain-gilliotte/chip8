@@ -11,12 +11,6 @@ static void push_byte(X86fn* func, uint8_t byte) {
 	func->buffer[func->buffer_ptr++] = byte;
 }
 
-/** Append a word, and increment pointer */
-static void push_word(X86fn* func, uint16_t word) {
-	*((uint16_t*)(func->buffer + func->buffer_ptr)) = word;
-	func->buffer_ptr += 2;
-}
-
 /** Append a dword, and increment pointer */
 static void push_dword(X86fn* func, uint32_t dword) {
 	*((uint32_t*)(func->buffer + func->buffer_ptr)) = dword;
@@ -49,24 +43,24 @@ static void push_modrm(X86fn* func, uint8_t mod, uint8_t rm, X86reg reg)
 	push_byte(func, byte);
 }
 
-/**
- * @see https://datacadamia.com/lang/assembly/intel/modrm
- * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#SIB
- */
-static void push_sibsb(X86fn* func, uint8_t sib, uint8_t rm, uint8_t index)
-{
-    uint8_t byte = (sib << 6) | (rm << 4) | index;
-	push_byte(func, byte);
-}
+// /**
+//  * @see https://datacadamia.com/lang/assembly/intel/modrm
+//  * @see https://wiki.osdev.org/X86-64_Instruction_Encoding#SIB
+//  */
+// static void push_sibsb(X86fn* func, uint8_t sib, uint8_t rm, uint8_t index)
+// {
+//     uint8_t byte = (sib << 6) | (rm << 4) | index;
+// 	push_byte(func, byte);
+// }
 
 
 static void push_rex(X86fn* func, bool w, bool r, bool x, bool b) {
-    uint8_t byte = 0b01000000 | (w << 3) | (r << 2) | (x << 1) | b;
+    uint8_t byte = 64 | (w << 3) | (r << 2) | (x << 1) | b;
     push_byte(func, byte);
 }
 
 
-static void push_op(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr, int32_t displacement) {
+static void push_opmemreg(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr, int32_t displacement) {
     // rex prefix only needed if we use R8...15 registers
     bool rex_b = ptr >> 3;
     bool rex_r = ptr >> 3;
@@ -81,15 +75,32 @@ static void push_op(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr, int32_t
     reg = (X86reg) (reg & 0x7);
     ptr = (X86reg) (ptr & 0x7);
     if (displacement < 256) { // compiler seems to consider the limit is 127
-        push_modrm(func, 0b01, ptr, reg);
+        push_modrm(func, 1, ptr, reg);
         push_byte(func, displacement); // disp8
     }
     else {
-        push_modrm(func, 0b10, ptr, reg);
+        push_modrm(func, 2, ptr, reg);
         push_dword(func, displacement); // disp32
     }
 }
 
+
+static void push_opregreg(X86fn* func, uint8_t opcode, X86reg reg, X86reg ptr) {
+    // rex prefix only needed if we use R8...15 registers
+    bool rex_b = ptr >> 3;
+    bool rex_r = ptr >> 3;
+    if (rex_b || rex_r) {
+        push_rex(func, 0, rex_r, 0, rex_b);
+    }
+
+    // instruction
+    push_byte(func, opcode);
+    
+    // modrm + displacement
+    reg = (X86reg) (reg & 0x7);
+    ptr = (X86reg) (ptr & 0x7);
+    push_modrm(func, 3, ptr, reg);
+}
 
 /////////
 // Init & run
@@ -125,7 +136,7 @@ int x86_run(X86fn* func) {
     }
 
     // What about calling conventions?
-    int (*fn)() = (int (*)()) func->buffer;
+    int (*fn)() = (int (*)()) (void*) func->buffer;
     return fn();
 }
 
@@ -159,33 +170,33 @@ void x86_mov_regimm64(X86fn* func, X86reg reg, uint64_t imm) {
 void x86_movzx_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x0f); // this will break if used with r8 and more.
     // the prefix should be between REX and primary opcode
-    push_op(func, 0xB6, reg, ptr, displacement);
+    push_opmemreg(func, 0xB6, reg, ptr, displacement);
 }
 
 void x86_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
-    push_op(func, 0x8A, reg, ptr, displacement);
+    push_opmemreg(func, 0x8A, reg, ptr, displacement);
 }
 
 void x86_mov_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
     push_byte(func, 0x66); //  Operand-Size prefix
-    push_op(func, 0x8B, reg, ptr, displacement);
+    push_opmemreg(func, 0x8B, reg, ptr, displacement);
 }
 
 void x86_mov_regmem32(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
-    push_op(func, 0x8B, reg, ptr, displacement);
+    push_opmemreg(func, 0x8B, reg, ptr, displacement);
 }
 
 void x86_mov_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x88, reg, ptr, displacement);
+    push_opmemreg(func, 0x88, reg, ptr, displacement);
 }
 
 void x86_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_byte(func, 0x66); //  Operand-Size prefix
-    push_op(func, 0x89, reg, ptr, displacement);
+    push_opmemreg(func, 0x89, reg, ptr, displacement);
 }
 
 void x86_mov_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x89, reg, ptr, displacement);
+    push_opmemreg(func, 0x89, reg, ptr, displacement);
 }
 
 void x86_retn(X86fn* func) {
@@ -195,44 +206,44 @@ void x86_retn(X86fn* func) {
 // add
 
 void x86_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x00, reg, ptr, displacement);
+    push_opmemreg(func, 0x00, reg, ptr, displacement);
 }
 
 void x86_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
     push_byte(func, 0x66); //  Operand-Size prefix
-    push_op(func, 0x01, reg, ptr, displacement);
+    push_opmemreg(func, 0x01, reg, ptr, displacement);
 }
 
 void x86_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x01, reg, ptr, displacement);
+    push_opmemreg(func, 0x01, reg, ptr, displacement);
 }
 
 // inc/dec
 
 void x86_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
-    push_op(func, 0xff, 0, ptr, displacement);    
+    push_opmemreg(func, 0xff, 0, ptr, displacement);    
 }
 
 void x86_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement) {
-    push_op(func, 0xff, 1, ptr, displacement);    
+    push_opmemreg(func, 0xff, 1, ptr, displacement);    
 }
 
 // others, 8 bits
 
 void x86_cmp_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
-    push_op(func, 0x3A, reg, ptr, displacement);
+    push_opmemreg(func, 0x3A, reg, ptr, displacement);
 }
 
 void x86_or_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x08, reg, ptr, displacement);
+    push_opmemreg(func, 0x08, reg, ptr, displacement);
 }
 
 void x86_and_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x20, reg, ptr, displacement);
+    push_opmemreg(func, 0x20, reg, ptr, displacement);
 }
 
 void x86_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
-    push_op(func, 0x30, reg, ptr, displacement);
+    push_opmemreg(func, 0x30, reg, ptr, displacement);
 }
 
 // jumps
@@ -246,3 +257,51 @@ void x86_jnz8(X86fn* func, int8_t distance) {
     push_byte(func, (uint8_t) distance);
 }
 
+
+void x86_setc(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_byte(func, 0x0F);
+    push_byte(func, 0x92);
+    
+    if (displacement < 256) { // compiler seems to consider the limit is 127
+        push_modrm(func, 1, ptr, 0);
+        push_byte(func, displacement); // disp8
+    }
+    else {
+        push_modrm(func, 2, ptr, 0);
+        push_dword(func, displacement); // disp32
+    }
+}
+
+void x86_setnc(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_byte(func, 0x0F);
+    push_byte(func, 0x93);
+    
+    if (displacement < 256) { // compiler seems to consider the limit is 127
+        push_modrm(func, 1, ptr, 0);
+        push_byte(func, displacement); // disp8
+    }
+    else {
+        push_modrm(func, 2, ptr, 0);
+        push_dword(func, displacement); // disp32
+    }
+}
+
+void x86_sub_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg) {
+    push_opmemreg(func, 0x28, reg, ptr, displacement);
+}
+
+void x86_shr_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_opmemreg(func, 0xd0, 5, ptr, displacement);
+}
+
+void x86_shl_memreg8(X86fn* func, X86reg ptr, int32_t displacement) {
+    push_opmemreg(func, 0xd0, 4, ptr, displacement);
+}
+
+void x86_sub_regreg8(X86fn* func, X86reg ptr, X86reg reg) {
+    push_opregreg(func, 0x28, reg, ptr);
+}
+
+void x86_sub_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement) {
+    push_opmemreg(func, 0x2A, reg, ptr, displacement);
+}

@@ -106,7 +106,7 @@ int main(int argc, const char **argv)
     // Init Chip8 & Recompiler
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
     
     CodeCacheRepository repository;
     recompiler_init(&repository);

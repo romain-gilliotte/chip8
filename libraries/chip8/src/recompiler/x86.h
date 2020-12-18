@@ -78,3 +78,13 @@ void x86_xor_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
 void x86_jz8(X86fn* func, int8_t distance);
 void x86_jnz8(X86fn* func, int8_t distance);
 
+
+void x86_setc(X86fn* func, X86reg ptr, int32_t displacement);
+void x86_setnc(X86fn* func, X86reg ptr, int32_t displacement);
+
+void x86_sub_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
+void x86_shr_memreg8(X86fn* func, X86reg ptr, int32_t displacement);
+void x86_shl_memreg8(X86fn* func, X86reg ptr, int32_t displacement);
+
+void x86_sub_regreg8(X86fn* func, X86reg ptr, X86reg reg);
+void x86_sub_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);

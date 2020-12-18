@@ -99,8 +99,13 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
     uint8_t kk = opcode & 0xFF;
 
     // Special case: Instruction just after an SE cannot be the end of the block
-    uint16_t prev_opcode = (state->memory[cache->end - 2] << 8) | state->memory[cache->end - 1];
-    bool must_continue = cache->start < cache->end && is_skip(prev_opcode);
+    bool must_continue = false;
+    if (cache->end >= 2 && cache->start < cache->end)
+        must_continue = is_skip((state->memory[cache->end - 2] << 8) | state->memory[cache->end - 1]);
+
+    // if ((opcode & 0x8000) != 0x8000) {
+    //                 return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+    // }
 
     switch (n1) {
         case 0x0:
@@ -193,33 +198,33 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
                     return true;
 
                 case 0x4: // ADD Vx, Vy
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
-                    // x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    // x86_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    // x86_setc(&cache->code, ECX, ecx_registers + 15);
-                    // return true;
+                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x86_add_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    return true;
 
                 case 0x5: // SUB Vx, Vy
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
-                    // x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
-                    // x86_sub_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    // x86_setnc(&cache->code, ECX, ecx_registers + 15); // x > y
-                    // return true;
+                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x86_sub_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    x86_setnc(&cache->code, ECX, ecx_registers + 15); // x > y
+                    return true;
 
                 case 0x6: // SHR Vx, Vy
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
-                    // x86_shr_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    // x86_setc(&cache->code, ECX, ecx_registers + 15);
-                    // return true;
+                    x86_shr_memreg8(&cache->code, ECX, ecx_registers + x);
+                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    return true;
 
                 case 0x7: // SUBN Vx, Vy
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+                    x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + y);
+                    x86_sub_regmem8(&cache->code, EAX, ECX, ecx_registers + x);
+                    x86_setnc(&cache->code, ECX, ecx_registers + 15);
+                    x86_mov_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
+                    return true;
 
                 case 0xE: // SHL Vx, Vy
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
-                    // x86_shl_memreg8(&cache->code, ECX, ecx_registers + x, EAX);
-                    // x86_setc(&cache->code, ECX, ecx_registers + 15);
-                    // return true;
+                    x86_shl_memreg8(&cache->code, ECX, ecx_registers + x);
+                    x86_setc(&cache->code, ECX, ecx_registers + 15);
+                    return true;
 
                 default:
                     return encode_error(cache, state, CHIP8_OPCODE_INVALID) || must_continue;
@@ -246,7 +251,20 @@ static bool encode_instruction(CodeCache* cache, Chip8* state) {
             return true;
 
         case 0xB: // JP V0, addr
-            return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+            // Update PC and cycles
+            x86_mov_regimm32(&cache->code, EAX, nnn);
+            x86_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+            x86_mov_regmem8(&cache->code, EAX, ECX, ecx_registers); // not super efficient
+            x86_add_memreg16(&cache->code, ECX, ecx_pc, EAX);
+
+            // Update cycles
+            x86_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
+            x86_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+
+            // return CHIP8_OK
+            x86_mov_regimm32(&cache->code, EAX, CHIP8_OK);
+            x86_retn(&cache->code);
+            return must_continue;
 
         case 0xC: // RND Vx, byte
             return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
