@@ -352,7 +352,7 @@ static void exec_dxyn(Chip8 *state)
     {
         for (int x = 0; x < 8; ++x)
         {
-            uint16_t position = (y0 + y) * state->screen_width + x0 + x;
+            uint16_t position = (y0 + y) % state->screen_height * state->screen_width + (x0 + x) % state->screen_width;
             uint8_t new_pixel = 1 & (state->memory[state->I + y] >> (7 - x));
 
             state->registers[15] |= new_pixel & state->display[position];
