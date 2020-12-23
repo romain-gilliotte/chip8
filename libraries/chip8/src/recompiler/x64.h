@@ -40,6 +40,7 @@ void x64_mov_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
 void x64_mov_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
 void x64_mov_regmem32(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
 void x64_movzx_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
+void x64_movzx_regmem16(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
 
 // memory <- reg
 void x64_mov_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
@@ -48,7 +49,7 @@ void x64_mov_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg)
 //////////
 // Add
 //////////
-
+void x64_add_aximm8(X86fn* func, uint8_t imm);
 void x64_add_memreg8(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
 void x64_add_memreg16(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
 void x64_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg);
@@ -57,6 +58,8 @@ void x64_add_memreg32(X86fn* func, X86reg ptr, int32_t displacement, X86reg reg)
 // Inc/Dec
 //////////
 
+void x64_inc_mem8(X86fn* func, X86reg ptr, int32_t displacement);
+void x64_dec_mem8(X86fn* func, X86reg ptr, int32_t displacement);
 void x64_inc_mem32(X86fn* func, X86reg ptr, int32_t displacement);
 void x64_dec_mem32(X86fn* func, X86reg ptr, int32_t displacement);
 
@@ -88,3 +91,6 @@ void x64_shl_memreg8(X86fn* func, X86reg ptr, int32_t displacement);
 
 void x64_sub_regreg8(X86fn* func, X86reg ptr, X86reg reg);
 void x64_sub_regmem8(X86fn* func, X86reg reg, X86reg ptr, int32_t displacement);
+
+void x64_add_regreg64(X86fn* func, X86reg reg, X86reg ptr);
+

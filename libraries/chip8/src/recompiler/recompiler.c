@@ -93,6 +93,7 @@ static bool translate_instruction(CodeCache* cache, Chip8* state) {
     uint32_t ecx_st = (uint64_t) &state->ST - (uint64_t) state;
     uint32_t ecx_pc = (uint64_t) &state->PC - (uint64_t) state;
     uint32_t ecx_sp = (uint64_t) &state->SP - (uint64_t) state;
+    uint32_t ecx_stack = (uint64_t) &state->stack - (uint64_t) state;
     uint32_t ecx_cycles = (uint64_t) &state->cycles_since_started - (uint64_t) state;
 
     // Decode opcode
@@ -116,7 +117,26 @@ static bool translate_instruction(CodeCache* cache, Chip8* state) {
                     return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
 
                 case 0x00EE: // RET
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+                    // state->SP--
+                    x64_dec_mem8(&cache->code, ECX, ecx_sp);
+
+                    // Compute pointer &state + SP*2
+                    x64_movzx_regmem8(&cache->code, EDX, ECX, ecx_sp); // sp dans rdx
+                    x64_add_regreg64(&cache->code, EDX, EDX); // multiplie par 2
+                    x64_add_regreg64(&cache->code, EDX, ECX); // &state dans rdx
+
+                    // Update PC and cycles
+                    x64_mov_regmem16(&cache->code, EAX, EDX, ecx_stack); // ax = [state + stack + 2*sp]
+                    x64_add_aximm8(&cache->code, 2); // ax += 2
+                    x64_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+
+                    x64_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
+                    x64_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+
+                    // return CHIP8_OK
+                    x64_mov_regimm32(&cache->code, EAX, CHIP8_OK);
+                    x64_retn(&cache->code);
+                    return must_continue;
 
                 default:
                     return encode_error(cache, state, CHIP8_OPCODE_INVALID) || must_continue;
@@ -135,7 +155,28 @@ static bool translate_instruction(CodeCache* cache, Chip8* state) {
             return must_continue;
 
         case 0x2: // CALL addr
-            return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+            // Compute pointer &state + SP*2
+            x64_movzx_regmem8(&cache->code, EDX, ECX, ecx_sp); // rdx = sp
+            x64_add_regreg64(&cache->code, EDX, EDX); // rdx *= 2
+            x64_add_regreg64(&cache->code, EDX, ECX); // rdx += &state
+
+            // Save PC
+            x64_mov_regimm32(&cache->code, EAX, cache->end);
+            x64_mov_memreg16(&cache->code, EDX, ecx_stack, EAX); // &state + ecx_stack + 2*sp = pc
+
+            // state->sp++
+            x64_inc_mem8(&cache->code, ECX, ecx_sp);
+
+            // Update PC and cycles
+            x64_mov_regimm32(&cache->code, EAX, nnn);
+            x64_mov_memreg16(&cache->code, ECX, ecx_pc, EAX);
+            x64_mov_regimm32(&cache->code, EAX, 1 + (cache->end - cache->start) / 2);
+            x64_add_memreg32(&cache->code, ECX, ecx_cycles, EAX);
+
+            // return CHIP8_OK
+            x64_mov_regimm32(&cache->code, EAX, CHIP8_OK);
+            x64_retn(&cache->code);
+            return must_continue;
 
         case 0x3: // SE Vx, byte
             x64_dec_mem32(&cache->code, ECX, ecx_cycles); // cycles--
@@ -318,10 +359,30 @@ static bool translate_instruction(CodeCache* cache, Chip8* state) {
                     return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
 
                 case 0x55: // LD [I], Vx
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+                    x64_movzx_regmem16(&cache->code, EDX, ECX, ecx_i);
+                    x64_add_regreg64(&cache->code, EDX, ECX);
+
+                    for (uint8_t reg_id = 0; reg_id <= x; ++reg_id) {
+                        x64_mov_regmem8(&cache->code, EAX, ECX, ecx_registers + reg_id);
+                        x64_mov_memreg8(&cache->code, EDX, ecx_memory + reg_id, EAX);
+                    }
+
+                    x64_mov_regimm32(&cache->code, EAX, x + 1);
+                    x64_add_memreg16(&cache->code, ECX, ecx_i, EAX);
+                    return true;
 
                 case 0x65: // LD Vx, [I]
-                    return encode_error(cache, state, CHIP8_OPCODE_NOT_SUPPORTED) || must_continue;
+                    x64_movzx_regmem16(&cache->code, EDX, ECX, ecx_i);
+                    x64_add_regreg64(&cache->code, EDX, ECX);
+
+                    for (uint8_t reg_id = 0; reg_id <= x; ++reg_id) {
+                        x64_mov_regmem8(&cache->code, EAX, EDX, ecx_memory + reg_id);
+                        x64_mov_memreg8(&cache->code, ECX, ecx_registers + reg_id, EAX);
+                    }
+
+                    x64_mov_regimm32(&cache->code, EAX, x + 1);
+                    x64_add_memreg16(&cache->code, ECX, ecx_i, EAX);
+                    return true;
 
                 default:
                     return encode_error(cache, state, CHIP8_OPCODE_INVALID) || must_continue;
