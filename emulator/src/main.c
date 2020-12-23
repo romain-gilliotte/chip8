@@ -59,10 +59,7 @@ static void scale2x(bool* sm_pb, bool* lg_pb, int width, int height) {
             e2 = d == h ? d : e;
             e3 = h == f ? f : e;
         } else {
-            e0 = e;
-            e1 = e;
-            e2 = e;
-            e3 = e;
+            e0 = e1 = e2 = e3 = e;
         }
 
         int x = i % width;
@@ -106,8 +103,10 @@ int main(int argc, const char **argv)
     // Init Chip8 & Recompiler
     Chip8 state;
     chip8_init(&state, 64, 32, 500);
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
-    
+    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
+    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/games/Lunar Lander (Udo Pernisz, 1979).ch8");
+
     CodeCacheRepository repository;
     recompiler_init(&repository);
 
@@ -121,7 +120,6 @@ int main(int argc, const char **argv)
         if (process_events(&state))
             break;
 
-        // if (interpreter_run(&state, ticks))
         if (recompiler_run(&repository, &state, SDL_GetTicks()))
             return 1;
 
