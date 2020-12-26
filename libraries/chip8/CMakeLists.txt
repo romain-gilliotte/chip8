@@ -10,14 +10,22 @@ add_library(${PROJECT_NAME})
 target_sources(
     ${PROJECT_NAME}
     PUBLIC
-        src/chip8.h
-        src/interpreter/interpreter.h
-        src/recompiler/recompiler.h
+        src/vm.h
+    
     PRIVATE
         src/chip8.c
+        src/chip8.h
+        src/disasm.c
+        src/disasm.h
         src/interpreter/interpreter.c
+        src/interpreter/interpreter.h
         src/recompiler/recompiler.c
+        src/recompiler/recompiler.h
+        src/recompiler/translate.c
+        src/recompiler/translate.h
         src/recompiler/x64.c
+        src/recompiler/x64.h
+        src/vm.c
 )
 
 target_include_directories(

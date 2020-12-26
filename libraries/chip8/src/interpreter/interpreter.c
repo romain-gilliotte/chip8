@@ -2,15 +2,36 @@
 #include <string.h>
 #include <stdlib.h>
 #include "interpreter.h"
+#include "../disasm.h"
+
+
+static Chip8Error exec_not_supported(Chip8 *state, Chip8Opcode* opcode)
+{
+    (void) state;
+    (void) opcode;
+
+    return CHIP8_OPCODE_NOT_SUPPORTED;
+}
+
+static Chip8Error exec_invalid(Chip8 *state, Chip8Opcode* opcode)
+{
+    (void) state;
+    (void) opcode;
+
+    return CHIP8_OPCODE_INVALID;
+}
 
 /**
  * 00E0 - CLS
  * Clear the display.
  */
-static void exec_00e0(Chip8 *state)
+static Chip8Error exec_cls(Chip8 *state, Chip8Opcode* opcode)
 {
+    (void) opcode;
+
     memset(state->display, 0, state->screen_width * state->screen_height);
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -19,10 +40,18 @@ static void exec_00e0(Chip8 *state)
  * 
  * The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
  */
-static void exec_00ee(Chip8 *state)
+static Chip8Error exec_ret(Chip8 *state, Chip8Opcode* opcode)
 {
-    state->SP--;
-    state->PC = state->stack[state->SP] + 2;
+    (void) opcode;
+
+    if (state->SP > 0) {
+        state->SP--;
+        state->PC = state->stack[state->SP] + 2;
+        return CHIP8_OK;
+    }
+    else {
+        return CHIP8_CALL_STACK_EMPTY;
+    }
 }
 
 /**
@@ -31,11 +60,10 @@ static void exec_00ee(Chip8 *state)
  * 
  * The interpreter sets the program counter to nnn.
  */
-static void exec_1nnn(Chip8 *state)
+static Chip8Error exec_jmp_nnn(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint16_t addr = ((uint16_t)(state->memory[state->PC] & 0x0F) << 8) + state->memory[state->PC + 1];
-
-    state->PC = addr;
+    state->PC = opcode->nnn;
+    return CHIP8_OK;
 }
 
 /**
@@ -44,13 +72,17 @@ static void exec_1nnn(Chip8 *state)
  * 
  * The interpreter increments the stack pointer, then puts the current PC on the top of the stack. The PC is then set to nnn.
  */
-static void exec_2nnn(Chip8 *state)
+static Chip8Error exec_call_nnn(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint16_t addr = ((uint16_t)(state->memory[state->PC] & 0x0F) << 8) + state->memory[state->PC + 1];
-
-    state->stack[state->SP] = state->PC;
-    state->SP++;
-    state->PC = addr;
+    if (state->SP < 16) {
+        state->stack[state->SP] = state->PC;
+        state->SP++;
+        state->PC = opcode->nnn;
+        return CHIP8_OK;
+    }
+    else {
+        return CHIP8_CALL_STACK_FULL;
+    }
 }
 
 /**
@@ -59,12 +91,10 @@ static void exec_2nnn(Chip8 *state)
  * 
  * The interpreter compares register Vx to kk, and if they are equal, increments the program counter by 2.
  */
-static void exec_3xkk(Chip8 *state)
+static Chip8Error exec_se_vx_kk(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t cst = state->memory[state->PC + 1];
-
-    state->PC += state->registers[x] == cst ? 4 : 2;
+    state->PC += state->registers[opcode->x] == opcode->kk ? 4 : 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -73,12 +103,10 @@ static void exec_3xkk(Chip8 *state)
  * 
  * The interpreter compares register Vx to kk, and if they are not equal, increments the program counter by 2.
  */
-static void exec_4xkk(Chip8 *state)
+static Chip8Error exec_sne_vx_kk(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t cst = state->memory[state->PC + 1];
-
-    state->PC += state->registers[x] != cst ? 4 : 2;
+    state->PC += state->registers[opcode->x] != opcode->kk ? 4 : 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -87,12 +115,10 @@ static void exec_4xkk(Chip8 *state)
  * 
  * The interpreter compares register Vx to register Vy, and if they are equal, increments the program counter by 2.
  */
-static void exec_5xy0(Chip8 *state)
+static Chip8Error exec_se_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->PC += state->registers[x] == state->registers[y] ? 4 : 2;
+    state->PC += state->registers[opcode->x] == state->registers[opcode->y] ? 4 : 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -101,13 +127,11 @@ static void exec_5xy0(Chip8 *state)
  * 
  * The interpreter puts the value kk into register Vx.
  */
-static void exec_6xkk(Chip8 *state)
+static Chip8Error exec_ld_vx_kk(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t cst = state->memory[state->PC + 1];
-
-    state->registers[x] = cst;
+    state->registers[opcode->x] = opcode->kk;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -116,13 +140,11 @@ static void exec_6xkk(Chip8 *state)
  * 
  * Adds the value kk to the value of register Vx, then stores the result in Vx.
  */
-static void exec_7xkk(Chip8 *state)
+static Chip8Error exec_add_vx_kk(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t cst = state->memory[state->PC + 1];
-
-    state->registers[x] += cst;
+    state->registers[opcode->x] += opcode->kk;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -131,13 +153,11 @@ static void exec_7xkk(Chip8 *state)
  * 
  * Stores the value of register Vy in register Vx.
  */
-static void exec_8xy0(Chip8 *state)
+static Chip8Error exec_ld_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[x] = state->registers[y];
+    state->registers[opcode->x] = state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -148,13 +168,11 @@ static void exec_8xy0(Chip8 *state)
  * A bitwise OR compares the corrseponding bits from two values, and if either bit is 1,
  * then the same bit in the result is also 1. Otherwise, it is 0.
  */
-static void exec_8xy1(Chip8 *state)
+static Chip8Error exec_or_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[x] |= state->registers[y];
+    state->registers[opcode->x] |= state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -165,13 +183,11 @@ static void exec_8xy1(Chip8 *state)
  * A bitwise AND compares the corrseponding bits from two values, and if both bits are 1,
  * then the same bit in the result is also 1. Otherwise, it is 0.
  */
-static void exec_8xy2(Chip8 *state)
+static Chip8Error exec_and_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[x] &= state->registers[y];
+    state->registers[opcode->x] &= state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -182,13 +198,11 @@ static void exec_8xy2(Chip8 *state)
  * An exclusive OR compares the corrseponding bits from two values, and if the bits are not 
  * both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0.
  */
-static void exec_8xy3(Chip8 *state)
+static Chip8Error exec_xor_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[x] ^= state->registers[y];
+    state->registers[opcode->x] ^= state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -199,14 +213,12 @@ static void exec_8xy3(Chip8 *state)
  * VF is set to 1, otherwise 0. 
  * Only the lowest 8 bits of the result are kept, and stored in Vx.
  */
-static void exec_8xy4(Chip8 *state)
+static Chip8Error exec_add_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[15] = (uint16_t)state->registers[x] + (uint16_t)state->registers[y] > 255;
-    state->registers[x] += state->registers[y];
+    state->registers[15] = (uint16_t)state->registers[opcode->x] + (uint16_t)state->registers[opcode->y] > 255;
+    state->registers[opcode->x] += state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -215,14 +227,12 @@ static void exec_8xy4(Chip8 *state)
  * 
  * If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
  */
-static void exec_8xy5(Chip8 *state)
+static Chip8Error exec_sub_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[15] = state->registers[x] > state->registers[y];
-    state->registers[x] -= state->registers[y];
+    state->registers[15] = state->registers[opcode->x] > state->registers[opcode->y];
+    state->registers[opcode->x] -= state->registers[opcode->y];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -231,13 +241,12 @@ static void exec_8xy5(Chip8 *state)
  * 
  * If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
  */
-static void exec_8xy6(Chip8 *state)
+static Chip8Error exec_shr_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->registers[15] = state->registers[x] & 0x1;
-    state->registers[x] >>= 1;
+    state->registers[15] = state->registers[opcode->x] & 0x1;
+    state->registers[opcode->x] >>= 1;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -246,14 +255,12 @@ static void exec_8xy6(Chip8 *state)
  * 
  * If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and the results stored in Vx.
  */
-static void exec_8xy7(Chip8 *state)
+static Chip8Error exec_subn_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->registers[15] = state->registers[y] > state->registers[x];
-    state->registers[x] = state->registers[y] - state->registers[x];
+    state->registers[15] = state->registers[opcode->y] > state->registers[opcode->x];
+    state->registers[opcode->x] = state->registers[opcode->y] - state->registers[opcode->x];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -262,13 +269,12 @@ static void exec_8xy7(Chip8 *state)
  * 
  * If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
  */
-static void exec_8xye(Chip8 *state)
+static Chip8Error exec_shl_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->registers[15] = state->registers[x] >> 7;
-    state->registers[x] <<= 1;
+    state->registers[15] = state->registers[opcode->x] >> 7;
+    state->registers[opcode->x] <<= 1;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -277,12 +283,10 @@ static void exec_8xye(Chip8 *state)
  * 
  * The values of Vx and Vy are compared, and if they are not equal, the program counter is increased by 2.
  */
-static void exec_9xy0(Chip8 *state)
+static Chip8Error exec_sne_vx_vy(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t y = state->memory[state->PC + 1] >> 4;
-
-    state->PC += state->registers[x] != state->registers[y] ? 4 : 2;
+    state->PC += state->registers[opcode->x] != state->registers[opcode->y] ? 4 : 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -291,12 +295,11 @@ static void exec_9xy0(Chip8 *state)
  * 
  * The value of register I is set to nnn.
  */
-static void exec_annn(Chip8 *state)
+static Chip8Error exec_ld_i_nnn(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint16_t addr = ((uint16_t)(state->memory[state->PC] & 0x0F) << 8) + state->memory[state->PC + 1];
-
-    state->I = addr;
+    state->I = opcode->nnn;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -305,11 +308,10 @@ static void exec_annn(Chip8 *state)
  * 
  * The program counter is set to nnn plus the value of V0.
  */
-static void exec_bnnn(Chip8 *state)
+static Chip8Error exec_jp_v0_nnn(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint16_t addr = ((uint16_t)(state->memory[state->PC] & 0x0F) << 8) + state->memory[state->PC + 1];
-
-    state->PC = state->registers[0] + addr;
+    state->PC = state->registers[0] + opcode->nnn;
+    return CHIP8_OK;
 }
 
 /**
@@ -319,12 +321,11 @@ static void exec_bnnn(Chip8 *state)
  * The interpreter generates a random number from 0 to 255, which is then ANDed with the value kk.
  * The results are stored in Vx. See instruction 8xy2 for more information on AND.
  */
-static void exec_cxkk(Chip8 *state)
+static Chip8Error exec_rnd_vx_kk(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->registers[x] = state->memory[state->PC + 1] & rand();
+    state->registers[opcode->x] = opcode->kk & rand();
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -341,12 +342,12 @@ static void exec_cxkk(Chip8 *state)
  * See instruction 8xy3 for more information on XOR, and section 2.4, Display, for more
  * information on the Chip-8 screen and sprites.
  */
-static void exec_dxyn(Chip8 *state)
+static Chip8Error exec_drw_vx_vy_n(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x0 = state->registers[state->memory[state->PC] & 0x0F];
-    uint8_t y0 = state->registers[(state->memory[state->PC + 1] >> 4) & 0x0F];
-    uint8_t n = state->memory[state->PC + 1] & 0x0F;
-
+    uint8_t x0 = state->registers[opcode->x];
+    uint8_t y0 = state->registers[opcode->y];
+    uint8_t n = opcode->n;
+    
     state->registers[15] = 0;
     for (int y = 0; y < n; ++y)
     {
@@ -362,6 +363,7 @@ static void exec_dxyn(Chip8 *state)
 
     state->display_dirty = true;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -370,11 +372,10 @@ static void exec_dxyn(Chip8 *state)
  * 
  * Checks the keyboard, and if the key corresponding to the value of Vx is currently in the down position, PC is increased by 2.
  */
-static void exec_ex9e(Chip8 *state)
+static Chip8Error exec_skp_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->PC += state->keyboard[state->registers[x]] ? 4 : 2;
+    state->PC += state->keyboard[state->registers[opcode->x]] ? 4 : 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -383,11 +384,10 @@ static void exec_ex9e(Chip8 *state)
  * 
  * Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up position, PC is increased by 2.
  */
-static void exec_exa1(Chip8 *state)
+static Chip8Error exec_sknp_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->PC += state->keyboard[state->registers[x]] ? 2 : 4;
+    state->PC += state->keyboard[state->registers[opcode->x]] ? 2 : 4;
+    return CHIP8_OK;
 }
 
 /**
@@ -396,12 +396,11 @@ static void exec_exa1(Chip8 *state)
  * 
  * The value of DT is placed into Vx.
  */
-static void exec_fx07(Chip8 *state)
+static Chip8Error exec_ld_vx_dt(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->registers[x] = state->DT;
+    state->registers[opcode->x] = state->DT;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -410,20 +409,20 @@ static void exec_fx07(Chip8 *state)
  * 
  * All execution stops until a key is pressed, then the value of that key is stored in Vx.
  */
-static void exec_fx0a(Chip8 *state)
+static Chip8Error exec_ld_vx_k(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
     int i;
     for (i = 0; i < 16; ++i)
         if (state->keyboard[i])
         {
-            state->registers[x] = i;
+            state->registers[opcode->x] = i;
             break;
         }
 
     if (i != 16)
         state->PC += 2;
+
+    return CHIP8_OK;
 }
 
 /**
@@ -432,12 +431,11 @@ static void exec_fx0a(Chip8 *state)
  * 
  * DT is set equal to the value of Vx.
  */
-static void exec_fx15(Chip8 *state)
+static Chip8Error exec_ld_dt_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->DT = state->registers[x];
+    state->DT = state->registers[opcode->x];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -446,12 +444,11 @@ static void exec_fx15(Chip8 *state)
  * 
  * ST is set equal to the value of Vx.
  */
-static void exec_fx18(Chip8 *state)
+static Chip8Error exec_ld_st_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->ST = state->registers[x];
+    state->ST = state->registers[opcode->x];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -460,12 +457,11 @@ static void exec_fx18(Chip8 *state)
  * 
  * The values of I and Vx are added, and the results are stored in I.
  */
-static void exec_fx1e(Chip8 *state)
+static Chip8Error exec_add_i_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->I += state->registers[x];
+    state->I += state->registers[opcode->x];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -475,12 +471,11 @@ static void exec_fx1e(Chip8 *state)
  * The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
  * See section 2.4, Display, for more information on the Chip-8 hexadecimal font.
  */
-static void exec_fx29(Chip8 *state)
+static Chip8Error exec_ld_f_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    state->I = 5 * state->registers[x];
+    state->I = 5 * state->registers[opcode->x];
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -490,10 +485,9 @@ static void exec_fx29(Chip8 *state)
  * The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at location in I,
  * the tens digit at location I+1, and the ones digit at location I+2.
  */
-static void exec_fx33(Chip8 *state)
+static Chip8Error exec_ld_b_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-    uint8_t remainder = state->registers[x];
+    uint8_t remainder = state->registers[opcode->x];
 
     for (int i = 0; i < 3; ++i)
     {
@@ -502,6 +496,7 @@ static void exec_fx33(Chip8 *state)
     }
 
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -510,15 +505,14 @@ static void exec_fx33(Chip8 *state)
  * 
  * The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
  */
-static void exec_fx55(Chip8 *state)
+static Chip8Error exec_ld_i_vx(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    for (int i = 0; i <= x; ++i)
+    for (int i = 0; i <= opcode->x; ++i)
         state->memory[state->I + i] = state->registers[i];
 
-    state->I += x + 1;
+    state->I += opcode->x + 1;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
 /**
@@ -527,198 +521,90 @@ static void exec_fx55(Chip8 *state)
  * 
  * The interpreter reads values from memory starting at location I into registers V0 through Vx.
  */
-static void exec_fx65(Chip8 *state)
+static Chip8Error exec_ld_vx_i(Chip8 *state, Chip8Opcode* opcode)
 {
-    uint8_t x = state->memory[state->PC] & 0x0F;
-
-    for (int i = 0; i <= x; ++i)
+    for (int i = 0; i <= opcode->x; ++i)
         state->registers[i] = state->memory[state->I + i];
 
-    state->I += x + 1;
+    state->I += opcode->x + 1;
     state->PC += 2;
+    return CHIP8_OK;
 }
 
-Chip8Error interpreter_run(Chip8 *state, uint32_t ticks)
-{
-    uint64_t expected_cc = ticks * state->clock_speed / 1000;
 
-    Chip8Error result = CHIP8_OK;
-    while (!result && state->cycles_since_started < expected_cc)
-    {
-        result = interpreter_step(state);
-    }
+static Chip8Error (*exec_opcode[])(Chip8 *, Chip8Opcode*) = {
+    // Original
+    exec_invalid,       // OPCODE_INVALID
+    exec_cls,           // OPCODE_CLS,
+    exec_ret,           // OPCODE_RET,
+    exec_jmp_nnn,       // OPCODE_JMP_NNN,
+    exec_call_nnn,      // OPCODE_CALL_NNN,
+    exec_se_vx_kk,      // OPCODE_SE_VX_KK,
+    exec_sne_vx_kk,     // OPCODE_SNE_VX_KK,
+    exec_se_vx_vy,      // OPCODE_SE_VX_VY,
+    exec_ld_vx_kk,      // OPCODE_LD_VX_KK,
+    exec_add_vx_kk,     // OPCODE_ADD_VX_KK,
+    exec_ld_vx_vy,      // OPCODE_LD_VX_VY,
+    exec_or_vx_vy,      // OPCODE_OR_VX_VY,
+    exec_and_vx_vy,     // OPCODE_AND_VX_VY,
+    exec_xor_vx_vy,     // OPCODE_XOR_VX_VY,
+    exec_add_vx_vy,     // OPCODE_ADD_VX_VY,
+    exec_sub_vx_vy,     // OPCODE_SUB_VX_VY,
+    exec_shr_vx_vy,     // OPCODE_SHR_VX_VY,
+    exec_subn_vx_vy,    // OPCODE_SUBN_VX_VY,
+    exec_shl_vx_vy,     // OPCODE_SHL_VX_VY,
+    exec_sne_vx_vy,     // OPCODE_SNE_VX_VY,
+    exec_ld_i_nnn,      // OPCODE_LD_I_NNN,
+    exec_jp_v0_nnn,     // OPCODE_JP_V0_NNN,
+    exec_rnd_vx_kk,     // OPCODE_RND_VX_KK,
+    exec_drw_vx_vy_n,   // OPCODE_DRW_VX_VY_N,
+    exec_skp_vx,        // OPCODE_SKP_VX,
+    exec_sknp_vx,       // OPCODE_SKNP_VX,
+    exec_ld_vx_dt,      // OPCODE_LD_VX_DT,
+    exec_ld_vx_k,       // OPCODE_LD_VX_K,
+    exec_ld_dt_vx,      // OPCODE_LD_DT_VX,
+    exec_ld_st_vx,      // OPCODE_LD_ST_VX,
+    exec_add_i_vx,      // OPCODE_ADD_I_VX,
+    exec_ld_f_vx,       // OPCODE_LD_F_VX,
+    exec_ld_b_vx,       // OPCODE_LD_B_VX,
+    exec_ld_i_vx,       // OPCODE_LD_I_VX,
+    exec_ld_vx_i,       // OPCODE_LD_VX_I,
+    
+    // Two-page display for CHIP-8
+    exec_cls,           // OPCODE_CLS_HIRES
 
-    return result;
-}
+    // S-Chip
+    exec_not_supported, // OPCODE_SCRL_DOWN_N,
+    exec_not_supported, // OPCODE_SCRL_LEFT,
+    exec_not_supported, // OPCODE_SCRL_RIGHT,
+    exec_not_supported, // OPCODE_EXIT,
+    exec_not_supported, // OPCODE_HIDEF_OFF,
+    exec_not_supported, // OPCODE_HIDEF_ON,
+    exec_not_supported, // OPCODE_LD_I_,
+    exec_not_supported, // OPCODE_LD_RPL_VX,
+    exec_not_supported, // OPCODE_LD_VX_RPL,
+
+    // XO-Chip
+    exec_not_supported, // OPCODE_LD_I_VX_VY,
+    exec_not_supported, // OPCODE_LD_VX_VY_I,
+    exec_not_supported, // OPCODE_LD_I_NNNN,
+    exec_not_supported, // OPCODE_DRW_PLN_N,
+    exec_not_supported, // OPCODE_LD_AUDIO_I,
+    exec_not_supported, // OPCODE_SCRL_UP_N,
+};
+
 
 Chip8Error interpreter_step(Chip8 *state)
 {
     chip8_disassemble(state, stdout);
+    Chip8Opcode opcode;
+    chip8_decode(state, &opcode, state->PC);
+   
+    Chip8Error error = exec_opcode[opcode.id](state, &opcode);
+    if (error != CHIP8_OK)
+        return error;
 
-    // Run current opcode.
-    uint16_t opcode = ((uint16_t)state->memory[state->PC] << 8) | state->memory[state->PC + 1];
-
-    switch (opcode & 0xF000)
-    {
-    case 0x0000:
-        switch (opcode)
-        {
-        case 0x00e0:
-            exec_00e0(state);
-            break;
-
-        case 0x00ee:
-            exec_00ee(state);
-            break;
-        default:
-            return CHIP8_OPCODE_NOT_SUPPORTED;
-        }
-        break;
-
-    case 0x1000:
-        exec_1nnn(state);
-        break;
-    case 0x2000:
-        exec_2nnn(state);
-        break;
-    case 0x3000:
-        exec_3xkk(state);
-        break;
-    case 0x4000:
-        exec_4xkk(state);
-        break;
-    case 0x5000:
-
-        if ((opcode & 0x000F) == 0)
-            exec_5xy0(state);
-        else
-            return CHIP8_OPCODE_INVALID;
-        break;
-
-    case 0x6000:
-        exec_6xkk(state);
-        break;
-    case 0x7000:
-        exec_7xkk(state);
-        break;
-    case 0x8000:
-        switch (opcode & 0x000F)
-        {
-        case 0x0000:
-            exec_8xy0(state);
-            break;
-        case 0x0001:
-            exec_8xy1(state);
-            break;
-        case 0x0002:
-            exec_8xy2(state);
-            break;
-        case 0x0003:
-            exec_8xy3(state);
-            break;
-        case 0x0004:
-            exec_8xy4(state);
-            break;
-        case 0x0005:
-            exec_8xy5(state);
-            break;
-        case 0x0006:
-            exec_8xy6(state);
-            break;
-        case 0x0007:
-            exec_8xy7(state);
-            break;
-        case 0x000E:
-            exec_8xye(state);
-            break;
-        default:
-            return CHIP8_OPCODE_INVALID;
-        }
-        break;
-    case 0x9000:
-        switch (opcode & 0x000F)
-        {
-        case 0:
-            exec_9xy0(state);
-            break;
-        default:
-            return CHIP8_OPCODE_INVALID;
-        }
-        break;
-    case 0xA000:
-        exec_annn(state);
-        break;
-    case 0xB000:
-        exec_bnnn(state);
-        break;
-    case 0xC000:
-        exec_cxkk(state);
-        break;
-    case 0xD000:
-        exec_dxyn(state);
-        break;
-    case 0xE000:
-        switch (opcode & 0x00FF)
-        {
-        case 0x9E:
-            exec_ex9e(state);
-            break;
-        case 0xA1:
-            exec_exa1(state);
-            break;
-        default:
-            return CHIP8_OPCODE_INVALID;
-        }
-        break;
-    case 0xF000:
-        switch (opcode & 0x00FF)
-        {
-        case 0x07:
-            exec_fx07(state);
-            break;
-        case 0x0A:
-            exec_fx0a(state);
-            break;
-        case 0x15:
-            exec_fx15(state);
-            break;
-        case 0x18:
-            exec_fx18(state);
-            break;
-        case 0x1E:
-            exec_fx1e(state);
-            break;
-        case 0x29:
-            exec_fx29(state);
-            break;
-        case 0x33:
-            exec_fx33(state);
-            break;
-        case 0x55:
-            exec_fx55(state);
-            break;
-        case 0x65:
-            exec_fx65(state);
-            break;
-        default:
-            return CHIP8_OPCODE_INVALID;
-        }
-        break;
-    }
-
-    // All instructions count as one cycle
     state->cycles_since_started++;
-
-    // Decrement timer at 60Hz, regardless of emulation clock speed.
-    int every = state->clock_speed / 60;
-    if (state->cycles_since_started % every == 0)
-    {
-        if (state->DT > 0)
-            state->DT--;
-
-        if (state->ST > 0)
-            state->ST--;
-    }
-
     return CHIP8_OK;
 }
+

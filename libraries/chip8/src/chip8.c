@@ -3,7 +3,12 @@
 #include <string.h>
 #include "chip8.h"
 
-static uint8_t sprites[5 * 16] = {
+static uint32_t memory_size[] = {4096, 4096, 4096, 65536};
+static uint32_t screen_width[] = {64, 64, 128, 64};
+static uint32_t screen_height[] = {32, 64, 128, 64};
+static uint32_t screen_channels[] = {1, 1, 1, 2};
+
+static uint8_t sprites[] = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -22,155 +27,114 @@ static uint8_t sprites[5 * 16] = {
     0xF0, 0x80, 0xF0, 0x80, 0x80, // F
 };
 
-int chip8_init(Chip8 *state, int width, int height, int clock_speed)
+Chip8Error chip8_init(Chip8 *state, Chip8Variant variant, uint32_t clock_speed)
 {
     memset(state, 0, sizeof *state);
-
-    // Init state
-    state->screen_width = width;
-    state->screen_height = height;
-    state->display = malloc(width * height);
+    state->variant = variant;
     state->clock_speed = clock_speed;
-    state->PC = 0x200;
+    state->memory = (uint8_t*) malloc(memory_size[variant]);
 
-    // Load fonts
-    memcpy(state->memory, sprites, 5 * 16);
+    if (variant == VARIANT_CHIP8_2PAGE) state->PC = 0x02c0;
+    else state->PC = 0x0200;
 
-    return 0;
+    state->screen_width = screen_width[variant];
+    state->screen_height = screen_height[variant];
+    state->display = (bool*) malloc(screen_width[variant] * screen_height[variant] * screen_channels[variant]);
+    memcpy(state->memory, sprites, 5 * 16); // Fonts
+
+    return CHIP8_OK;
 }
 
-int chip8_load_rom(Chip8 *state, const char *rom)
+Chip8Error chip8_load_rom(Chip8 *state, const char *rom)
 {
-    // Load ROM
     FILE *f = fopen(rom, "rb");
     if (f == NULL)
         return CHIP8_ROM_NOT_FOUND;
 
     fseek(f, 0, SEEK_END);
     long fsize = ftell(f);
-    if (fsize < 0 || sizeof(state->memory) < (unsigned) fsize + 0x200)
+    if (fsize < 0 || memory_size[state->variant] < (uint32_t) fsize + 0x200)
         return CHIP8_ROM_TOO_LONG;
 
     fseek(f, 0, SEEK_SET);
     fread(state->memory + 0x200, fsize, 1, f);
     fclose(f);
 
-    return 0;
+    return CHIP8_OK;
 }
 
-void chip8_disassemble(Chip8 *state, FILE *f)
-{
-    uint16_t opcode = state->memory[state->PC + 1] | (state->memory[state->PC] << 8); // big endian
-    uint16_t q1 = opcode & 0xF000;
-    uint16_t q4 = opcode & 0x000F;
+Chip8Error chip8_decode(Chip8 *state, Chip8Opcode* decoded, uint16_t address) {
+    uint16_t opcode = decoded->opcode = state->memory[address + 1] | (state->memory[address] << 8); // big endian
+    uint16_t n1 = opcode & 0xF000;
+    uint16_t n4 = opcode & 0x000F;
+    uint8_t kk = decoded->kk = opcode & 0xFF;
+    
+    decoded->x = (opcode >> 8) & 0x0F;
+    decoded->y = (opcode >> 4) & 0x0F;
+    decoded->n = opcode & 0x0F;
+    decoded->nnn = opcode & 0x0FFF;
 
-    uint8_t x = (opcode >> 8) & 0xF;
-    uint8_t y = (opcode >> 4) & 0xF;
-    uint8_t kk = opcode & 0xFF;
-    uint16_t nnn = opcode & 0xFFF;
-
-    fprintf(f, "0x%04x: ", state->PC);
-
-    if (q1 == 0x0000)
+    if (n1 == 0x0000)
     {
-        if (opcode == 0x00E0)
-            fprintf(f, "CLS");
-        else if (opcode == 0x00ee)
-            fprintf(f, "RET");
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if (opcode == 0x00E0) decoded->id = OPCODE_CLS;
+        else if (opcode == 0x00ee) decoded->id = OPCODE_RET;
+        else if (state->variant == VARIANT_CHIP8_2PAGE && opcode == 0x230) decoded->id = OPCODE_CLS_HIRES;
+        else decoded->id = OPCODE_INVALID;
     }
-    else if (q1 == 0x1000)
-        fprintf(f, "JMP  0x%04x", nnn);
-    else if (q1 == 0x2000)
-        fprintf(f, "CALL 0x%04x", nnn);
-    else if (q1 == 0x3000)
-        fprintf(f, "SE   V%x, 0x%02x", x, kk);
-    else if (q1 == 0x4000)
-        fprintf(f, "SNE  V%x, 0x%02x", x, kk);
-    else if (q1 == 0x5000)
+    else if (n1 == 0x1000) decoded->id = OPCODE_JMP_NNN;
+    else if (n1 == 0x2000) decoded->id = OPCODE_CALL_NNN;
+    else if (n1 == 0x3000) decoded->id = OPCODE_SE_VX_KK;
+    else if (n1 == 0x4000) decoded->id = OPCODE_SNE_VX_KK;
+    else if (n1 == 0x5000)
     {
-        if ((opcode & 0x000F) == 0)
-            fprintf(f, "SE   V%x, V%x", x, y);
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if ((opcode & 0x000F) == 0) decoded->id = OPCODE_SE_VX_VY;
+        else decoded->id = OPCODE_INVALID;
     }
-    else if (q1 == 0x6000)
-        fprintf(f, "LD   V%x, 0x%02x", x, kk);
-    else if (q1 == 0x7000)
-        fprintf(f, "ADD  V%x, 0x%02x", x, kk);
-    else if (q1 == 0x8000)
+    else if (n1 == 0x6000) decoded->id = OPCODE_LD_VX_KK;
+    else if (n1 == 0x7000) decoded->id = OPCODE_ADD_VX_KK;
+    else if (n1 == 0x8000)
     {
-        if (q4 == 0x0000)
-            fprintf(f, "LD   V%x, V%x", x, y);
-        else if (q4 == 0x0001)
-            fprintf(f, "OR   V%x, V%x", x, y);
-        else if (q4 == 0x0002)
-            fprintf(f, "AND  V%x, V%x", x, y);
-        else if (q4 == 0x0003)
-            fprintf(f, "XOR  V%x, V%x", x, y);
-        else if (q4 == 0x0004)
-            fprintf(f, "ADD  V%x, V%x", x, y);
-        else if (q4 == 0x0005)
-            fprintf(f, "SUB  V%x, V%x", x, y);
-        else if (q4 == 0x0006)
-            fprintf(f, "SHR  V%x, V%x", x, y);
-        else if (q4 == 0x0007)
-            fprintf(f, "SUBN V%x, V%x", x, y);
-        else if (q4 == 0x000e)
-            fprintf(f, "SHL  V%x, V%x", x, y);
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if (n4 == 0x0000) decoded->id = OPCODE_LD_VX_VY;
+        else if (n4 == 0x0001) decoded->id = OPCODE_OR_VX_VY;
+        else if (n4 == 0x0002) decoded->id = OPCODE_AND_VX_VY;
+        else if (n4 == 0x0003) decoded->id = OPCODE_XOR_VX_VY;
+        else if (n4 == 0x0004) decoded->id = OPCODE_ADD_VX_VY;
+        else if (n4 == 0x0005) decoded->id = OPCODE_SUB_VX_VY;
+        else if (n4 == 0x0006) decoded->id = OPCODE_SHR_VX_VY;
+        else if (n4 == 0x0007) decoded->id = OPCODE_SUBN_VX_VY;
+        else if (n4 == 0x000e) decoded->id = OPCODE_SHL_VX_VY;
+        else decoded->id = OPCODE_INVALID;
     }
-    else if (q1 == 0x9000)
+    else if (n1 == 0x9000)
     {
-        if (q4 == 0x0000)
-            fprintf(f, "SNE  V%x, V%x", x, y);
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if (n4 == 0x0000) decoded->id = OPCODE_SNE_VX_VY;
+        else decoded->id = OPCODE_INVALID;
     }
-    else if (q1 == 0xA000)
-        fprintf(f, "LD   I,  0x%04x", nnn);
-    else if (q1 == 0xB000)
-        fprintf(f, "JP   V0, 0x%04x", nnn);
-    else if (q1 == 0xC000)
-        fprintf(f, "RND  V%x, 0x%02x", x, kk);
-    else if (q1 == 0xD000)
-        fprintf(f, "DRW  V%x, V%x, %d", x, y, q4);
-    else if (q1 == 0xE000)
+    else if (n1 == 0xA000) decoded->id = OPCODE_LD_I_NNN;
+    else if (n1 == 0xB000) decoded->id = OPCODE_JP_V0_NNN;
+    else if (n1 == 0xC000) decoded->id = OPCODE_RND_VX_KK;
+    else if (n1 == 0xD000) decoded->id = OPCODE_DRW_VX_VY_N;
+    else if (n1 == 0xE000)
     {
-        if (kk == 0x009e)
-            fprintf(f, "SKP  V%x", x);
-        else if (kk == 0x00a1)
-            fprintf(f, "SKNP V%x", x);
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if (kk == 0x009e) decoded->id = OPCODE_SKP_VX;
+        else if (kk == 0x00a1) decoded->id = OPCODE_SKNP_VX;
+        else decoded->id = OPCODE_INVALID;
     }
-    else if (q1 == 0xF000)
+    else if (n1 == 0xF000)
     {
-        if (kk == 0x07)
-            fprintf(f, "LD   V%x, DT", x);
-        else if (kk == 0x0a)
-            fprintf(f, "LD   V%x, K", x);
-        else if (kk == 0x15)
-            fprintf(f, "LD   DT, V%x", x);
-        else if (kk == 0x18)
-            fprintf(f, "LD   ST, V%x", x);
-        else if (kk == 0x1e)
-            fprintf(f, "ADD  I, V%x", x);
-        else if (kk == 0x29)
-            fprintf(f, "LD   F, V%x", x);
-        else if (kk == 0x33)
-            fprintf(f, "LD   B, V%x", x);
-        else if (kk == 0x55)
-            fprintf(f, "LD   [I], V%x", x);
-        else if (kk == 0x65)
-            fprintf(f, "LD   V%x, [I]", x);
-        else
-            fprintf(f, "Invalid opcode: 0x%04x", opcode);
+        if (kk == 0x07) decoded->id = OPCODE_LD_VX_DT;
+        else if (kk == 0x0a) decoded->id = OPCODE_LD_VX_K;
+        else if (kk == 0x15) decoded->id = OPCODE_LD_DT_VX;
+        else if (kk == 0x18) decoded->id = OPCODE_LD_ST_VX;
+        else if (kk == 0x1e) decoded->id = OPCODE_ADD_I_VX;
+        else if (kk == 0x29) decoded->id = OPCODE_LD_F_VX;
+        else if (kk == 0x33) decoded->id = OPCODE_LD_B_VX;
+        else if (kk == 0x55) decoded->id = OPCODE_LD_I_VX;
+        else if (kk == 0x65) decoded->id = OPCODE_LD_VX_I;
+        else decoded->id = OPCODE_INVALID;
     }
 
-    fprintf(f, "\n");
+    return decoded->id == OPCODE_INVALID ? CHIP8_OPCODE_INVALID : CHIP8_OK;
 }
 
 int chip8_dump(Chip8 *state, FILE *f)

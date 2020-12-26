@@ -159,6 +159,10 @@ int x64_run(X86fn* func) {
     return fn();
 }
 
+int x64_release(X86fn* func) {
+    return munmap(func->buffer, func->buffer_size);
+}
+
 /////////
 // Instructions
 /////////

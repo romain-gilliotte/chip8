@@ -1,9 +1,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <SDL2/SDL.h>
-#include <chip8.h>
-#include <interpreter/interpreter.h>
-#include <recompiler/recompiler.h>
+#include <vm.h>
 
 static bool process_events(Chip8 *state)
 {
@@ -100,34 +98,37 @@ int main(int argc, const char **argv)
     (void) argc;
     (void) argv;
     
-    // Init Chip8 & Recompiler
-    Chip8 state;
-    chip8_init(&state, 64, 32, 500);
-    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
-    // chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
-    chip8_load_rom(&state, "/home/eloims/Projects/Personal/Chip8/roms/games/Lunar Lander (Udo Pernisz, 1979).ch8");
-
-    CodeCacheRepository repository;
-    recompiler_init(&repository);
+    // Init VM
+    Chip8VirtualMachine vm;
+    chip8vm_init(&vm, RECOMPILER, VARIANT_CHIP8, 500);
+    // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/games/Lunar Lander (Udo Pernisz, 1979).ch8");
+    chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
+    // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
+    // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/hires/Astro Dodge Hires [Revival Studios, 2008].ch8");
 
     // Init SDL
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *window = SDL_CreateWindow("Chip8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 320, SDL_WINDOW_RESIZABLE);
+    SDL_Window *window = SDL_CreateWindow(
+        "Chip8",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        vm.state.screen_width * 10, vm.state.screen_height * 10,
+        SDL_WINDOW_RESIZABLE
+    );
 
     // Main loop
     while (true)
     {
-        if (process_events(&state))
+        if (process_events(&vm.state))
             break;
 
-        if (recompiler_run(&repository, &state, SDL_GetTicks()))
+        if (chip8vm_run(&vm, SDL_GetTicks()))
             return 1;
 
-        if (state.display_dirty) {
+        if (vm.state.display_dirty) {
             bool pb_large[4096 * 4];
-            scale2x(state.display, pb_large, state.screen_width, state.screen_height);
-            render(window, pb_large, 2 * state.screen_width, 2 * state.screen_height);
-            state.display_dirty = false;
+            scale2x(vm.state.display, pb_large, vm.state.screen_width, vm.state.screen_height);
+            render(window, pb_large, 2 * vm.state.screen_width, 2 * vm.state.screen_height);
+            vm.state.display_dirty = false;
         }
 
         SDL_Delay(1);

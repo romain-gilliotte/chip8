@@ -24,6 +24,7 @@ typedef struct {
 int x64_init(X86fn* fn, uint32_t size);
 int x64_lock(X86fn* fn);
 int x64_run(X86fn* fn);
+int x64_release(X86fn* func);
 
 void x64_retn(X86fn* func);
 

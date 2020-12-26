@@ -1,18 +1,13 @@
 #pragma once
-#include "x64.h"
+#include "translate.h"
 #include "../chip8.h"
-
-typedef struct {
-    X86fn code;
-    uint16_t start;
-    uint16_t end;
-} CodeCache;
 
 typedef struct {
 
     CodeCache* caches[4096];
 
-} CodeCacheRepository;
+} RecompilerState;
 
-void recompiler_init(CodeCacheRepository* repository);
-Chip8Error recompiler_run(CodeCacheRepository* repository, Chip8 *state, uint64_t ticks);
+Chip8Error recompiler_init(RecompilerState* repository);
+Chip8Error recompiler_step(RecompilerState* repository, Chip8 *state);
+

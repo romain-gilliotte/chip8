@@ -10,7 +10,7 @@
 static int setup(void **state)
 {
     Chip8 *chip = malloc(sizeof(Chip8));
-    chip8_init(chip, 64, 48, 500);
+    chip8_init(chip, VARIANT_CHIP8, 500);
     *state = chip;
 
     return 0;
