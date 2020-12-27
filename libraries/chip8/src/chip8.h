@@ -108,9 +108,6 @@ typedef enum {
     OPCODE_LD_I_VX,
     OPCODE_LD_VX_I,
 
-    // Two-page display for CHIP-8
-    OPCODE_CLS_HIRES,
-
     // S-Chip
     OPCODE_SCRL_DOWN_N, // 00cn Scroll display N lines down
     OPCODE_SCRL_LEFT,   // 00fb Scroll display 4 pixels right
@@ -118,7 +115,7 @@ typedef enum {
     OPCODE_EXIT,        // 00fd Exit CHIP interpreter
     OPCODE_HIDEF_OFF,   // 00fe Disable extended screen mode
     OPCODE_HIDEF_ON,    // 00ff Enable extended screen mode for full-screen graphics
-    OPCODE_LD_I_,       // fx30 Point I to 10-byte font sprite for digit VX (0..9)
+    OPCODE_LD_I_DIGIT,  // fx30 Point I to 10-byte font sprite for digit VX (0..9)
     OPCODE_LD_RPL_VX,   // fx75 Store V0..VX in RPL user flags (X <= 7)
     OPCODE_LD_VX_RPL,   // fx85 Read V0..VX from RPL user flags (X <= 7)
 

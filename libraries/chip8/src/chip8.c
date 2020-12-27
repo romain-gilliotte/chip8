@@ -34,7 +34,7 @@ Chip8Error chip8_init(Chip8 *state, Chip8Variant variant, uint32_t clock_speed)
     state->clock_speed = clock_speed;
     state->memory = (uint8_t*) malloc(memory_size[variant]);
 
-    if (variant == VARIANT_CHIP8_2PAGE) state->PC = 0x02c0;
+    if (variant == VARIANT_TWO_PAGES) state->PC = 0x02c0;
     else state->PC = 0x0200;
 
     state->screen_width = screen_width[variant];
@@ -64,11 +64,15 @@ Chip8Error chip8_load_rom(Chip8 *state, const char *rom)
 }
 
 Chip8Error chip8_decode(Chip8 *state, Chip8Opcode* decoded, uint16_t address) {
+    bool is_two_page = state->variant == VARIANT_TWO_PAGES;
+    bool is_superchip = state->variant == VARIANT_SUPER_CHIP || state->variant == VARIANT_XO_CHIP;
+    bool is_xochip = state->variant == VARIANT_XO_CHIP;
+
     uint16_t opcode = decoded->opcode = state->memory[address + 1] | (state->memory[address] << 8); // big endian
     uint16_t n1 = opcode & 0xF000;
     uint16_t n4 = opcode & 0x000F;
     uint8_t kk = decoded->kk = opcode & 0xFF;
-    
+
     decoded->x = (opcode >> 8) & 0x0F;
     decoded->y = (opcode >> 4) & 0x0F;
     decoded->n = opcode & 0x0F;
@@ -76,9 +80,16 @@ Chip8Error chip8_decode(Chip8 *state, Chip8Opcode* decoded, uint16_t address) {
 
     if (n1 == 0x0000)
     {
-        if (opcode == 0x00E0) decoded->id = OPCODE_CLS;
+        if (is_superchip && (opcode & 0xfff0) == 0x00c0) decoded->id = OPCODE_SCRL_DOWN_N;
+        else if (opcode == 0x00e0) decoded->id = OPCODE_CLS;
         else if (opcode == 0x00ee) decoded->id = OPCODE_RET;
-        else if (state->variant == VARIANT_CHIP8_2PAGE && opcode == 0x230) decoded->id = OPCODE_CLS_HIRES;
+        else if (is_xochip && (opcode & 0xfff0) == 0x00d0) decoded->id = OPCODE_SCRL_UP_N;
+        else if (is_superchip && opcode == 0x00fb) decoded->id = OPCODE_SCRL_RIGHT;
+        else if (is_superchip && opcode == 0x00fc) decoded->id = OPCODE_SCRL_LEFT;
+        else if (is_superchip && opcode == 0x00fd) decoded->id = OPCODE_EXIT;
+        else if (is_superchip && opcode == 0x00fe) decoded->id = OPCODE_HIDEF_ON;
+        else if (is_superchip && opcode == 0x00ff) decoded->id = OPCODE_HIDEF_OFF;
+        else if (is_two_page && opcode == 0x230) decoded->id = OPCODE_CLS;
         else decoded->id = OPCODE_INVALID;
     }
     else if (n1 == 0x1000) decoded->id = OPCODE_JMP_NNN;
@@ -87,7 +98,9 @@ Chip8Error chip8_decode(Chip8 *state, Chip8Opcode* decoded, uint16_t address) {
     else if (n1 == 0x4000) decoded->id = OPCODE_SNE_VX_KK;
     else if (n1 == 0x5000)
     {
-        if ((opcode & 0x000F) == 0) decoded->id = OPCODE_SE_VX_VY;
+        if (n4 == 0) decoded->id = OPCODE_SE_VX_VY;
+        else if (is_xochip && n4 == 2) decoded->id = OPCODE_LD_I_VX_VY;
+        else if (is_xochip && n4 == 3) decoded->id = OPCODE_LD_VX_VY_I;
         else decoded->id = OPCODE_INVALID;
     }
     else if (n1 == 0x6000) decoded->id = OPCODE_LD_VX_KK;
@@ -122,15 +135,21 @@ Chip8Error chip8_decode(Chip8 *state, Chip8Opcode* decoded, uint16_t address) {
     }
     else if (n1 == 0xF000)
     {
-        if (kk == 0x07) decoded->id = OPCODE_LD_VX_DT;
+        if (is_xochip && opcode == 0xf000) decoded->id = OPCODE_LD_I_NNNN;
+        else if (kk == 0x01) decoded->id = OPCODE_DRW_PLN_N;
+        else if (kk == 0x02) decoded->id = OPCODE_LD_AUDIO_I;
+        else if (kk == 0x07) decoded->id = OPCODE_LD_VX_DT;
         else if (kk == 0x0a) decoded->id = OPCODE_LD_VX_K;
         else if (kk == 0x15) decoded->id = OPCODE_LD_DT_VX;
         else if (kk == 0x18) decoded->id = OPCODE_LD_ST_VX;
         else if (kk == 0x1e) decoded->id = OPCODE_ADD_I_VX;
         else if (kk == 0x29) decoded->id = OPCODE_LD_F_VX;
+        else if (is_superchip && kk == 0x30) decoded->id = OPCODE_LD_I_DIGIT;
         else if (kk == 0x33) decoded->id = OPCODE_LD_B_VX;
         else if (kk == 0x55) decoded->id = OPCODE_LD_I_VX;
         else if (kk == 0x65) decoded->id = OPCODE_LD_VX_I;
+        else if (is_superchip && kk == 0x75) decoded->id = OPCODE_LD_RPL_VX;
+        else if (is_superchip && kk == 0x85) decoded->id = OPCODE_LD_VX_RPL;
         else decoded->id = OPCODE_INVALID;
     }
 

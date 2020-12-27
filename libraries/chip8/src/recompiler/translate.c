@@ -366,9 +366,6 @@ static bool (*encode_instruction[])(CodeCache*, Chip8*, Chip8Opcode*) = {
     encode_not_supported, // OPCODE_LD_B_VX,
     encode_not_supported, // OPCODE_LD_I_VX,
     encode_not_supported, // OPCODE_LD_VX_I,
-    
-    // Two-page display for CHIP-8
-    encode_not_supported, // OPCODE_CLS_HIRES
 
     // S-Chip
     encode_not_supported, // OPCODE_SCRL_DOWN_N,

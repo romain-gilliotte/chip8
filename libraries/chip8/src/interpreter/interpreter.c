@@ -570,9 +570,6 @@ static Chip8Error (*exec_opcode[])(Chip8 *, Chip8Opcode*) = {
     exec_ld_i_vx,       // OPCODE_LD_I_VX,
     exec_ld_vx_i,       // OPCODE_LD_VX_I,
     
-    // Two-page display for CHIP-8
-    exec_cls,           // OPCODE_CLS_HIRES
-
     // S-Chip
     exec_not_supported, // OPCODE_SCRL_DOWN_N,
     exec_not_supported, // OPCODE_SCRL_LEFT,
