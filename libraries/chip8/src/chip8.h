@@ -26,7 +26,7 @@ typedef enum {
  */
 typedef enum {
     VARIANT_CHIP8,          // http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
-    VARIANT_CHIP8_2PAGE,    // https://chip-8.github.io/extensions/#two-page-display-for-chip-8
+    VARIANT_TWO_PAGES,    // https://chip-8.github.io/extensions/#two-page-display-for-chip-8
     VARIANT_SUPER_CHIP,     // https://github.com/JohnEarnest/Octo/blob/gh-pages/docs/SuperChip.md
     VARIANT_XO_CHIP,        // https://github.com/JohnEarnest/Octo/blob/gh-pages/docs/XO-ChipSpecification.md
 } Chip8Variant;
@@ -36,8 +36,6 @@ typedef struct
 {
     Chip8Variant variant;
 
-    uint32_t screen_width;
-    uint32_t screen_height;
     uint32_t clock_speed;
     uint32_t cycles_since_started;
 
@@ -50,7 +48,10 @@ typedef struct
     uint8_t* memory;
 
     // IO
-    bool *display; // one byte per pixel
+    uint8_t *display;
+    uint8_t display_mask;
+    uint32_t display_width;
+    uint32_t display_height;
     uint8_t keyboard[16];
 
     // Registers
@@ -115,6 +116,7 @@ typedef enum {
     OPCODE_EXIT,        // 00fd Exit CHIP interpreter
     OPCODE_HIDEF_OFF,   // 00fe Disable extended screen mode
     OPCODE_HIDEF_ON,    // 00ff Enable extended screen mode for full-screen graphics
+    OPCODE_DRW_VX_VY_0, // dxy0 Draw 16 x 16 sprite (only if high-resolution mode is enabled)
     OPCODE_LD_I_DIGIT,  // fx30 Point I to 10-byte font sprite for digit VX (0..9)
     OPCODE_LD_RPL_VX,   // fx75 Store V0..VX in RPL user flags (X <= 7)
     OPCODE_LD_VX_RPL,   // fx85 Read V0..VX from RPL user flags (X <= 7)

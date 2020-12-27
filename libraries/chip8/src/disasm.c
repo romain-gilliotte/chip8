@@ -191,6 +191,7 @@ static void (*disassemble_arr[])(Chip8Opcode*, FILE*) = {
     disassemble_invalid, // OPCODE_EXIT,
     disassemble_invalid, // OPCODE_HIDEF_OFF,
     disassemble_invalid, // OPCODE_HIDEF_ON,
+    disassemble_invalid, // OPCODE_DRW_VX_VY_0
     disassemble_invalid, // OPCODE_LD_I_,
     disassemble_invalid, // OPCODE_LD_RPL_VX,
     disassemble_invalid, // OPCODE_LD_VX_RPL,

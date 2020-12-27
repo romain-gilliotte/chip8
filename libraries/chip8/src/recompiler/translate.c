@@ -374,7 +374,8 @@ static bool (*encode_instruction[])(CodeCache*, Chip8*, Chip8Opcode*) = {
     encode_not_supported, // OPCODE_EXIT,
     encode_not_supported, // OPCODE_HIDEF_OFF,
     encode_not_supported, // OPCODE_HIDEF_ON,
-    encode_not_supported, // OPCODE_LD_I_,
+    encode_not_supported, // OPCODE_DRW_VX_VY_0
+    encode_not_supported, // OPCODE_LD_I_AUDIO,
     encode_not_supported, // OPCODE_LD_RPL_VX,
     encode_not_supported, // OPCODE_LD_VX_RPL,
 
