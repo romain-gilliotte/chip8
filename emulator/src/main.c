@@ -100,12 +100,12 @@ int main(int argc, const char **argv)
     
     // Init VM
     Chip8VirtualMachine vm;
-    chip8vm_init(&vm, INTERPRETER, VARIANT_SUPER_CHIP, 500);
+    chip8vm_init(&vm, INTERPRETER, VARIANT_TWO_PAGES, 500);
     // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/test_opcode.ch8");
     // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/games/Lunar Lander (Udo Pernisz, 1979).ch8");
     // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/demos/Trip8 Demo (2008) [Revival Studios].ch8");
-    // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/hires/Astro Dodge Hires [Revival Studios, 2008].ch8");
-    chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/superchip/Car [Klaus von Sengbusch, 1994].ch8");
+    chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/hires/Trip8 Hires Demo (2008) [Revival Studios].ch8");
+    // chip8vm_load_rom(&vm, "/home/eloims/Projects/Personal/Chip8/roms/superchip/Car [Klaus von Sengbusch, 1994].ch8");
 
     // Init SDL
     SDL_Init(SDL_INIT_VIDEO);

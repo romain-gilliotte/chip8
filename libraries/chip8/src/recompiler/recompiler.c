@@ -18,6 +18,6 @@ Chip8Error recompiler_step(RecompilerState* repository, Chip8 *state) {
         repository->caches[state->PC] = cache;
     }
 
-    // Run section & handle errors
+    // Run section
     return (Chip8Error) x64_run(&cache->code);
 }

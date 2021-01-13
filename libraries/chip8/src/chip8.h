@@ -45,7 +45,7 @@ typedef struct
     // Machine
     ////////////
 
-    uint8_t* memory;
+    uint8_t *memory;
 
     // IO
     uint8_t *display;

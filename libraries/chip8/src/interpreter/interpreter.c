@@ -684,7 +684,6 @@ static Chip8Error (*exec_opcode[])(Chip8 *, Chip8Opcode*) = {
 
 Chip8Error interpreter_step(Chip8 *state)
 {
-    chip8_disassemble(state, stdout);
     Chip8Opcode opcode;
     chip8_decode(state, &opcode, state->PC);
 
